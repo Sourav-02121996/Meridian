@@ -1,0 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { font-family: 'DM Sans', sans-serif; color: #18231f; background: #f3f4ee; font-synthesis: none; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background-image: radial-gradient(circle at 85% 0%, rgba(232,173,74,.14), transparent 28%), radial-gradient(circle at 0% 40%, rgba(78,113,95,.1), transparent 25%); }
+button, input, textarea, select { font: inherit; }
+.font-display { font-family: 'Manrope', sans-serif; }
+.card { @apply rounded-2xl border border-black/5 bg-white shadow-[0_10px_35px_rgba(24,35,31,0.06)]; }
+.field { @apply rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-sage focus:ring-2 focus:ring-sage/10; }
+.btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50; }
