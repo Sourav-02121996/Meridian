@@ -8,19 +8,37 @@ def build_jobs_workbook(jobs) -> BytesIO:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Jobs"
-    headers = ["Score", "Title", "Company", "ATS Platform", "Status", "Apply URL",
-               "Missing Skills", "Weak Requirements", "Date Fetched", "Date Applied"]
+    headers = [
+        "Score",
+        "Title",
+        "Company",
+        "ATS Platform",
+        "Status",
+        "Apply URL",
+        "Missing Skills",
+        "Weak Requirements",
+        "Date Fetched",
+        "Date Applied",
+    ]
     sheet.append(headers)
     for cell in sheet[1]:
         cell.font = Font(bold=True)
     sheet.freeze_panes = "A2"
     for job in sorted(jobs, key=lambda item: item.score, reverse=True):
-        sheet.append([
-            job.score, job.title, job.company, job.ats_platform, job.status.value, job.apply_url,
-            ", ".join(job.missing_skills or []), "; ".join(job.weak_requirements or []),
-            job.date_fetched.replace(tzinfo=None) if job.date_fetched else None,
-            job.date_applied.replace(tzinfo=None) if job.date_applied else None,
-        ])
+        sheet.append(
+            [
+                job.score,
+                job.title,
+                job.company,
+                job.ats_platform,
+                job.status.value,
+                job.apply_url,
+                ", ".join(job.missing_skills or []),
+                "; ".join(job.weak_requirements or []),
+                job.date_fetched.replace(tzinfo=None) if job.date_fetched else None,
+                job.date_applied.replace(tzinfo=None) if job.date_applied else None,
+            ]
+        )
         link = sheet.cell(sheet.max_row, 6)
         if job.apply_url:
             link.hyperlink = job.apply_url

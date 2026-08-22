@@ -35,12 +35,16 @@ class Job(Base):
     matched_skills: Mapped[list] = mapped_column(JSON, default=list)
     missing_skills: Mapped[list] = mapped_column(JSON, default=list)
     weak_requirements: Mapped[list] = mapped_column(JSON, default=list)
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.discovered, index=True)
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(JobStatus), default=JobStatus.discovered, index=True
+    )
     date_fetched: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     date_scored: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     date_applied: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
 
 
 class Setting(Base):

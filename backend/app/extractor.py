@@ -47,7 +47,9 @@ def _display_value(value: Any, keys: tuple[str, ...]) -> str:
     return ""
 
 
-def _first_display(data: dict, field_keys: tuple[str, ...], value_keys: tuple[str, ...], default: str) -> str:
+def _first_display(
+    data: dict, field_keys: tuple[str, ...], value_keys: tuple[str, ...], default: str
+) -> str:
     wanted = {key.lower() for key in field_keys}
     for key, value in _walk(data):
         if key.lower() in wanted:
@@ -80,7 +82,9 @@ def _rendered_description(raw: dict) -> str:
         sections.extend(str(item).strip() for item in activities if str(item).strip())
     skills = processed.get("technical_tools")
     if isinstance(skills, list) and skills:
-        sections.extend(("Skills", ", ".join(str(item).strip() for item in skills if str(item).strip())))
+        sections.extend(
+            ("Skills", ", ".join(str(item).strip() for item in skills if str(item).strip()))
+        )
     certifications = processed.get("licenses_or_certifications")
     if isinstance(certifications, list) and certifications:
         sections.extend(("Licenses and certifications", ", ".join(map(str, certifications))))
@@ -89,12 +93,16 @@ def _rendered_description(raw: dict) -> str:
 
 def extract_job(raw: dict) -> dict:
     title = _first_display(
-        raw, ("title", "job_title", "core_job_title"),
-        ("name", "title", "label", "job_title", "core_job_title"), "Untitled role",
+        raw,
+        ("title", "job_title", "core_job_title"),
+        ("name", "title", "label", "job_title", "core_job_title"),
+        "Untitled role",
     )
     company = _first_display(
-        raw, ("company_name", "companyName", "company"),
-        ("name", "company_name", "companyName", "label"), "Unknown company",
+        raw,
+        ("company_name", "companyName", "company"),
+        ("name", "company_name", "companyName", "label"),
+        "Unknown company",
     )
     description_html = _first_key(raw, ("description", "job_description", "jobDescription", "text"))
     description = BeautifulSoup(description_html, "html.parser").get_text("\n", strip=True)
@@ -105,7 +113,11 @@ def extract_job(raw: dict) -> dict:
     candidates = _urls(raw)
     preferred = [u for u in candidates if any(domain in u.lower() for domain in ATS_DOMAINS)]
     apply_is_internal = "hiring.cafe" in apply_url.lower()
-    if preferred and (not apply_url or apply_is_internal or not any(domain in apply_url.lower() for domain in ATS_DOMAINS)):
+    if preferred and (
+        not apply_url
+        or apply_is_internal
+        or not any(domain in apply_url.lower() for domain in ATS_DOMAINS)
+    ):
         apply_url = preferred[0]
     elif not apply_url and candidates:
         apply_url = next((u for u in candidates if "hiring.cafe" not in u.lower()), candidates[0])

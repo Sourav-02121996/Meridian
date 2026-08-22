@@ -1,4 +1,5 @@
 """Manual-only helper: opens queued jobs and waits for the user between each one."""
+
 from playwright.sync_api import sync_playwright
 from sqlalchemy import select
 

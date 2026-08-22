@@ -21,13 +21,21 @@ def filtered_jobs_stmt(status: JobStatus | None, min_score: float | None, q: str
         stmt = stmt.where(Job.score >= min_score)
     if q.strip():
         term = f"%{q.strip()}%"
-        stmt = stmt.where(or_(Job.title.ilike(term), Job.company.ilike(term), Job.description.ilike(term)))
+        stmt = stmt.where(
+            or_(Job.title.ilike(term), Job.company.ilike(term), Job.description.ilike(term))
+        )
     return stmt
 
 
 @router.get("", response_model=list[JobOut])
-def list_jobs(status: JobStatus | None = None, min_score: float | None = Query(None, ge=0, le=100),
-              sort: SortField = "score", order: SortOrder = "desc", q: str = "", db: Session = Depends(get_db)):
+def list_jobs(
+    status: JobStatus | None = None,
+    min_score: float | None = Query(None, ge=0, le=100),
+    sort: SortField = "score",
+    order: SortOrder = "desc",
+    q: str = "",
+    db: Session = Depends(get_db),
+):
     stmt = filtered_jobs_stmt(status, min_score, q)
     column = Job.score if sort == "score" else Job.date_fetched
     stmt = stmt.order_by((desc if order == "desc" else asc)(column))
@@ -35,8 +43,12 @@ def list_jobs(status: JobStatus | None = None, min_score: float | None = Query(N
 
 
 @router.get("/export")
-def export_jobs(status: JobStatus | None = None, min_score: float | None = Query(None, ge=0, le=100),
-                q: str = "", db: Session = Depends(get_db)):
+def export_jobs(
+    status: JobStatus | None = None,
+    min_score: float | None = Query(None, ge=0, le=100),
+    q: str = "",
+    db: Session = Depends(get_db),
+):
     jobs = list(db.scalars(filtered_jobs_stmt(status, min_score, q)).all())
     filename = f"hirelight_jobs_{date.today().isoformat()}.xlsx"
     return StreamingResponse(

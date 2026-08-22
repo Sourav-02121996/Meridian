@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import Response, TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 from .config import get_settings
+
 log = logging.getLogger("hirelight.crawler")
 
 
@@ -54,8 +55,15 @@ def _ssr_items(html: str) -> list[dict]:
         return []
 
 
-def crawl(query: str, days: int, departments=None, seniority=None, target: int = 100,
-          headed: bool | None = None, progress: Callable[[int], None] | None = None) -> list[dict]:
+def crawl(
+    query: str,
+    days: int,
+    departments=None,
+    seniority=None,
+    target: int = 100,
+    headed: bool | None = None,
+    progress: Callable[[int], None] | None = None,
+) -> list[dict]:
     state = build_search_state(query, days)
     if departments is not None:
         state["departments"] = departments
