@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     default_days: int = 2
     score_threshold: float = 82
     model_name: str = "sentence-transformers/all-mpnet-base-v2"
-    db_url: str = "sqlite:///./hirelight.db"
+    db_url: str = "sqlite:///./meridian.db"
     frontend_origin: str = "http://localhost:5173"
     crawler_headless: bool = True
 

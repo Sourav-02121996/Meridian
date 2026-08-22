@@ -97,7 +97,7 @@ function App() {
             <Sparkles size={21} />
           </div>
           <div>
-            <h1 className="font-display text-xl font-extrabold tracking-tight">Hirelight</h1>
+            <h1 className="font-display text-xl font-extrabold tracking-tight">Meridian</h1>
             <p className="text-xs text-black/45">Find the work that fits</p>
           </div>
           <span className="ml-auto rounded-full bg-sage/10 px-3 py-1 text-xs font-semibold text-sage">
@@ -396,7 +396,7 @@ function ExportButton({ params }: { params: URLSearchParams }) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `hirelight_jobs_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.download = `meridian_jobs_${new Date().toISOString().slice(0, 10)}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
     },

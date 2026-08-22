@@ -1,8 +1,8 @@
-# Hirelight
+# Meridian
 
-Hirelight is a local, single-user job discovery and application-tracking dashboard. It drives HiringCafe's rendered site in Chromium, extracts original ATS links, scores each description against your resume, and highlights the gaps worth addressing before you apply. It does not call HiringCafe's private API directly.
+Meridian is a local, single-user job discovery and application-tracking dashboard. It drives HiringCafe's rendered site in Chromium, extracts original ATS links, scores each description against your resume, and highlights the gaps worth addressing before you apply. It does not call HiringCafe's private API directly.
 
-Applications are deliberately manual. Hirelight opens the original posting and tracks your status; it never mass-submits forms.
+Applications are deliberately manual. Meridian opens the original posting and tracks your status; it never mass-submits forms.
 
 ## Requirements
 
@@ -36,7 +36,7 @@ The default SQLite database is created inside `backend/`. On the first discovery
 
 The match score is a local heuristic combining requirement coverage, hard-skill overlap, and overall semantic similarity. It is not an industry ATS score. Calibrate the threshold using several roles you already consider good and poor fits rather than treating the default of 82 as universal.
 
-If Cloudflare challenges the crawler, set `CRAWLER_HEADLESS=false` in `backend/.env`, restart Hirelight, and complete the one-time challenge in the visible Chromium window. Empty searches are handled normally; broaden the query or date range.
+If Cloudflare challenges the crawler, set `CRAWLER_HEADLESS=false` in `backend/.env`, restart Meridian, and complete the one-time challenge in the visible Chromium window. Empty searches are handled normally; broaden the query or date range.
 
 ## Manual assisted apply (optional)
 
