@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 PYTHON="$ROOT_DIR/.venv/bin/python"
 if [[ ! -x "$PYTHON" ]]; then
-  echo "Hirelight: missing .venv. Run: python3.11 -m venv .venv && .venv/bin/python -m pip install -r backend/requirements.txt"
+  echo "Meridian: missing .venv. Run: python3.11 -m venv .venv && .venv/bin/python -m pip install -r backend/requirements.txt"
   exit 1
 fi
 

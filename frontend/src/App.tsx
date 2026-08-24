@@ -37,17 +37,17 @@ const statusLabels: Record<Status, string> = {
   applied: 'Applied',
   skipped: 'Skipped',
 };
-const colors = ['#4e715f', '#e8ad4a', '#7e92b8', '#c77b67'];
+const colors = ['#2563eb', '#d89b24', '#168f83', '#df6c55'];
 
 function scoreTone(score: number, threshold: number) {
   return score >= threshold
-    ? 'bg-emerald-100 text-emerald-800'
+    ? 'bg-sage text-white'
     : score >= Math.max(0, threshold - 17)
-      ? 'bg-amber-100 text-amber-800'
-      : 'bg-slate-100 text-slate-600';
+      ? 'bg-sun/20 text-amber-900'
+      : 'bg-neutral-100 text-neutral-600';
 }
 
-function App() {
+function Dashboard() {
   const qc = useQueryClient(),
     settingsQ = useQuery({ queryKey: ['settings'], queryFn: api.settings }),
     statsQ = useQuery({ queryKey: ['stats'], queryFn: api.stats });
@@ -90,135 +90,125 @@ function App() {
     },
   });
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-black/5 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-5 py-4 lg:px-10">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-sun">
-            <Sparkles size={21} />
-          </div>
-          <div>
-            <h1 className="font-display text-xl font-extrabold tracking-tight">Meridian</h1>
-            <p className="text-xs text-black/45">Find the work that fits</p>
-          </div>
-          <span className="ml-auto rounded-full bg-sage/10 px-3 py-1 text-xs font-semibold text-sage">
-            Local & private
-          </span>
+    <main className="mx-auto w-full max-w-[1500px] flex-1 space-y-7 px-5 py-10 lg:px-10">
+      <section className="border-b border-black/15 pb-7">
+        <p className="eyebrow mb-3 w-fit">Your workspace</p>
+        <h1 className="font-display text-4xl font-extrabold tracking-[-0.045em] sm:text-5xl">
+          Make your next move.
+        </h1>
+      </section>
+      <section className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
+        <ResumePanel
+          value={resume}
+          setValue={setResume}
+          saving={resumeM.isPending}
+          onSave={() => resumeM.mutate(resume)}
+        />
+        <Discover onDone={refresh} />
+      </section>
+      <div className="card flex flex-wrap items-center gap-5 px-5 py-4">
+        <Target className="text-sage" />
+        <div>
+          <p className="font-semibold">Your match threshold</p>
+          <p className="text-xs text-black/45">Jobs at or above this score are highlighted</p>
         </div>
-      </header>
-      <main className="mx-auto max-w-[1500px] space-y-7 px-5 py-7 lg:px-10">
-        <section className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
-          <ResumePanel
-            value={resume}
-            setValue={setResume}
-            saving={resumeM.isPending}
-            onSave={() => resumeM.mutate(resume)}
-          />
-          <Discover onDone={refresh} />
-        </section>
-        <div className="card flex flex-wrap items-center gap-5 px-5 py-4">
-          <Target className="text-sage" />
-          <div>
-            <p className="font-semibold">Your match threshold</p>
-            <p className="text-xs text-black/45">Jobs at or above this score are highlighted</p>
-          </div>
-          <input
-            className="min-w-48 flex-1 accent-[#4e715f]"
-            aria-label="Match threshold"
-            type="range"
-            min="0"
-            max="100"
-            value={threshold}
-            onChange={(e) => setThreshold(+e.target.value)}
-            onPointerUp={(e) => thresholdM.mutate(+(e.currentTarget as HTMLInputElement).value)}
-            onKeyUp={(e) => {
-              if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key))
-                thresholdM.mutate(+(e.currentTarget as HTMLInputElement).value);
-            }}
-          />
-          <span className="rounded-xl bg-sage px-3 py-1.5 font-display font-bold text-white">
-            {threshold}
-          </span>
-        </div>
-        <StatCards stats={statsQ.data} />
-        <Charts stats={statsQ.data} />
-        <section className="card overflow-hidden">
-          <div className="border-b border-black/5 p-5">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="font-display text-xl font-bold">Job pipeline</h2>
-                <p className="text-sm text-black/45">Review matches and keep your search moving.</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-black/45">
-                  {jobsQ.data?.length ?? 0} jobs
-                </span>
-                <ExportButton params={params} />
-              </div>
+        <input
+          className="min-w-48 flex-1 accent-[#2563eb]"
+          aria-label="Match threshold"
+          type="range"
+          min="0"
+          max="100"
+          value={threshold}
+          onChange={(e) => setThreshold(+e.target.value)}
+          onPointerUp={(e) => thresholdM.mutate(+(e.currentTarget as HTMLInputElement).value)}
+          onKeyUp={(e) => {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key))
+              thresholdM.mutate(+(e.currentTarget as HTMLInputElement).value);
+          }}
+        />
+        <span className="rounded-xl bg-sage px-3 py-1.5 font-display font-bold text-white">
+          {threshold}
+        </span>
+      </div>
+      <StatCards stats={statsQ.data} />
+      <Charts stats={statsQ.data} />
+      <section className="card overflow-hidden">
+        <div className="border-b border-black/5 p-5">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="font-display text-xl font-bold">Job pipeline</h2>
+              <p className="text-sm text-black/45">Review matches and keep your search moving.</p>
             </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              <label className="field flex items-center gap-2">
-                <Search size={16} />
-                <input
-                  className="min-w-0 flex-1 outline-none"
-                  placeholder="Search roles or companies"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </label>
-              <select className="field" value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="">All statuses</option>
-                {Object.entries(statusLabels).map(([v, l]) => (
-                  <option value={v} key={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-black/45">
+                {jobsQ.data?.length ?? 0} jobs
+              </span>
+              <ExportButton params={params} />
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="field flex items-center gap-2">
+              <Search size={16} />
               <input
-                className="field"
-                type="number"
-                min="0"
-                max="100"
-                placeholder="Minimum score"
-                value={minScore}
-                onChange={(e) => setMinScore(e.target.value)}
+                className="min-w-0 flex-1 outline-none"
+                placeholder="Search roles or companies"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
-              <select
-                className="field"
-                value={`${sort}-${order}`}
-                onChange={(e) => {
-                  const [s, o] = e.target.value.split('-');
-                  setSort(s);
-                  setOrder(o);
-                }}
-              >
-                <option value="score-desc">Highest score</option>
-                <option value="score-asc">Lowest score</option>
-                <option value="date-desc">Newest first</option>
-                <option value="date-asc">Oldest first</option>
-              </select>
-            </div>
-            <p className="mt-2 text-right text-xs text-black/35">
-              Excel export reflects the active status, score, and search filters.
+            </label>
+            <select className="field" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">All statuses</option>
+              {Object.entries(statusLabels).map(([v, l]) => (
+                <option value={v} key={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+            <input
+              className="field"
+              type="number"
+              min="0"
+              max="100"
+              placeholder="Minimum score"
+              value={minScore}
+              onChange={(e) => setMinScore(e.target.value)}
+            />
+            <select
+              className="field"
+              value={`${sort}-${order}`}
+              onChange={(e) => {
+                const [s, o] = e.target.value.split('-');
+                setSort(s);
+                setOrder(o);
+              }}
+            >
+              <option value="score-desc">Highest score</option>
+              <option value="score-asc">Lowest score</option>
+              <option value="date-desc">Newest first</option>
+              <option value="date-asc">Oldest first</option>
+            </select>
+          </div>
+          <p className="mt-2 text-right text-xs text-black/35">
+            Excel export reflects the active status, score, and search filters.
+          </p>
+        </div>
+        {jobsQ.isLoading ? (
+          <div className="p-12 text-center text-black/45">Loading your pipeline…</div>
+        ) : jobsQ.isError ? (
+          <ErrorBox error={jobsQ.error} />
+        ) : jobsQ.data?.length ? (
+          <JobTable jobs={jobsQ.data} threshold={threshold} onChanged={refresh} />
+        ) : (
+          <div className="p-16 text-center">
+            <BriefcaseBusiness className="mx-auto mb-3 text-black/25" size={40} />
+            <p className="font-display font-bold">No jobs here yet</p>
+            <p className="mt-1 text-sm text-black/45">
+              Save your resume, then discover your first batch of roles.
             </p>
           </div>
-          {jobsQ.isLoading ? (
-            <div className="p-12 text-center text-black/45">Loading your pipeline…</div>
-          ) : jobsQ.isError ? (
-            <ErrorBox error={jobsQ.error} />
-          ) : jobsQ.data?.length ? (
-            <JobTable jobs={jobsQ.data} threshold={threshold} onChanged={refresh} />
-          ) : (
-            <div className="p-16 text-center">
-              <BriefcaseBusiness className="mx-auto mb-3 text-black/25" size={40} />
-              <p className="font-display font-bold">No jobs here yet</p>
-              <p className="mt-1 text-sm text-black/45">
-                Save your resume, then discover your first batch of roles.
-              </p>
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
+        )}
+      </section>
+    </main>
   );
 }
 
@@ -274,7 +264,9 @@ function ResumePanel({
         />
       </label>
       {uploadM.error && <p className="mb-3 text-sm text-red-600">{uploadM.error.message}</p>}
-      {uploadMessage && <p className="mb-3 text-sm text-emerald-700">{uploadMessage}</p>}
+      {uploadMessage && (
+        <p className="mb-3 text-sm font-medium text-neutral-700">{uploadMessage}</p>
+      )}
       <textarea
         className="field h-36 w-full resize-none"
         placeholder="Paste your resume text here…"
@@ -322,7 +314,7 @@ function Discover({ onDone }: { onDone: () => void }) {
   return (
     <section className="card p-6">
       <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-xl bg-sun/15 p-2 text-amber-700">
+        <div className="rounded-xl bg-black/5 p-2 text-black">
           <Sparkles size={20} />
         </div>
         <div>
@@ -380,7 +372,7 @@ function Discover({ onDone }: { onDone: () => void }) {
           <p className="text-sm text-red-600">{mutation.error?.message || statusQ.data?.error}</p>
         )}
         {result && !polling && (
-          <p className="text-sm text-emerald-700">
+          <p className="text-sm font-medium text-neutral-700">
             {result.fetched} fetched · {result.new} new · {result.above_threshold} strong matches
           </p>
         )}
@@ -452,7 +444,7 @@ function Charts({ stats }: any) {
           <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
           <Tooltip />
-          <Bar name="Jobs" dataKey="count" fill="#4e715f" radius={[5, 5, 0, 0]} />
+          <Bar name="Jobs" dataKey="count" fill="#2563eb" radius={[5, 5, 0, 0]} />
         </BarChart>
       </Chart>
       <Chart title="Jobs by ATS">
@@ -463,12 +455,12 @@ function Charts({ stats }: any) {
           <YAxis yAxisId="score" orientation="right" domain={[0, 100]} tick={{ fontSize: 11 }} />
           <Tooltip />
           <Legend />
-          <Bar yAxisId="count" name="Jobs" dataKey="count" fill="#e8ad4a" radius={[5, 5, 0, 0]} />
+          <Bar yAxisId="count" name="Jobs" dataKey="count" fill="#d89b24" radius={[5, 5, 0, 0]} />
           <Bar
             yAxisId="score"
             name="Avg score"
             dataKey="avg_score"
-            fill="#4e715f"
+            fill="#168f83"
             radius={[5, 5, 0, 0]}
           />
         </BarChart>
@@ -500,9 +492,9 @@ function Charts({ stats }: any) {
             name="Applications"
             type="monotone"
             dataKey="count"
-            stroke="#4e715f"
+            stroke="#2563eb"
             strokeWidth={3}
-            dot={{ fill: '#4e715f' }}
+            dot={{ fill: '#d89b24' }}
           />
         </LineChart>
       </Chart>
@@ -575,7 +567,7 @@ function JobRow({
     onSettled: onChanged,
   });
   return (
-    <article className={job.score >= threshold ? 'bg-emerald-50/40' : ''}>
+    <article className={job.score >= threshold ? 'bg-neutral-100/70' : ''}>
       <div className="grid items-center gap-3 px-5 py-4 md:grid-cols-[72px_1fr_1fr_110px_130px_32px]">
         <span
           className={`w-fit rounded-xl px-3 py-2 font-display text-sm font-extrabold ${scoreTone(job.score, threshold)}`}
@@ -589,7 +581,7 @@ function JobRow({
           </p>
         </div>
         <p className="text-sm font-medium text-black/65">{job.company}</p>
-        <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs capitalize text-slate-600">
+        <span className="w-fit rounded-full bg-neutral-100 px-2.5 py-1 text-xs capitalize text-neutral-600">
           {job.ats_platform}
         </span>
         <select
@@ -616,7 +608,7 @@ function JobRow({
       </div>
       {open && (
         <div className="border-t border-black/5 bg-white/70 px-5 py-5">
-          <div className="mb-5 grid gap-3 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
+          <div className="mb-5 grid gap-3 rounded-xl bg-neutral-100 p-3 text-sm sm:grid-cols-3">
             <span>
               Requirements <b>{Math.round(job.requirement_coverage * 100)}%</b>
             </span>
@@ -636,14 +628,16 @@ function JobRow({
                 {job.missing_skills.length ? (
                   job.missing_skills.map((s) => (
                     <span
-                      className="rounded-lg bg-amber-100 px-2 py-1 text-xs text-amber-800"
+                      className="rounded-lg bg-neutral-200 px-2 py-1 text-xs text-neutral-700"
                       key={s}
                     >
                       {s}
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm text-emerald-700">No obvious skill gaps</span>
+                  <span className="text-sm font-medium text-neutral-700">
+                    No obvious skill gaps
+                  </span>
                 )}
               </div>
             </div>
@@ -658,7 +652,7 @@ function JobRow({
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-emerald-700">Strong requirement coverage</p>
+                <p className="text-sm font-medium text-neutral-700">Strong requirement coverage</p>
               )}
             </div>
           </div>
@@ -674,17 +668,19 @@ function JobRow({
                 Open original posting
               </a>
             ) : (
-              <span className="text-sm text-amber-700">No external posting URL was provided.</span>
+              <span className="text-sm text-neutral-600">
+                No external posting URL was provided.
+              </span>
             )}
             <button
-              className="btn bg-emerald-100 text-emerald-800"
+              className="btn bg-black text-white hover:bg-neutral-800"
               disabled={patch.isPending}
               onClick={() => patch.mutate('applied')}
             >
               Mark applied
             </button>
             <button
-              className="btn bg-slate-100 text-slate-600"
+              className="btn bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
               disabled={patch.isPending}
               onClick={() => patch.mutate('skipped')}
             >
@@ -700,4 +696,4 @@ function JobRow({
 function ErrorBox({ error }: { error: Error }) {
   return <div className="m-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error.message}</div>;
 }
-export default App;
+export default Dashboard;

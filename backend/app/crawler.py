@@ -9,7 +9,7 @@ from playwright.sync_api import Response, TimeoutError as PlaywrightTimeoutError
 
 from .config import get_settings
 
-log = logging.getLogger("hirelight.crawler")
+log = logging.getLogger("meridian.crawler")
 
 
 class ScrapeError(RuntimeError):
@@ -119,14 +119,14 @@ def crawl(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Hirelight HiringCafe browser crawler")
+    parser = argparse.ArgumentParser(description="Meridian HiringCafe browser crawler")
     parser.add_argument("--query", default=get_settings().default_query)
     parser.add_argument("--days", type=int, default=get_settings().default_days)
     parser.add_argument("--target", type=int, default=120)
     parser.add_argument("--headed", action="store_true")
     args = parser.parse_args()
     jobs = crawl(args.query, args.days, target=args.target, headed=args.headed)
-    print(f"Hirelight: collected {len(jobs)} jobs")
+    print(f"Meridian: collected {len(jobs)} jobs")
 
 
 if __name__ == "__main__":

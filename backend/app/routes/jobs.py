@@ -50,7 +50,7 @@ def export_jobs(
     db: Session = Depends(get_db),
 ):
     jobs = list(db.scalars(filtered_jobs_stmt(status, min_score, q)).all())
-    filename = f"hirelight_jobs_{date.today().isoformat()}.xlsx"
+    filename = f"meridian_jobs_{date.today().isoformat()}.xlsx"
     return StreamingResponse(
         build_jobs_workbook(jobs),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

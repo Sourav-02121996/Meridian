@@ -15,7 +15,7 @@ from ..schemas import ScrapeRequest
 from ..scorer import score_job
 
 router = APIRouter(prefix="/api/scrape", tags=["scrape"])
-log = logging.getLogger("hirelight.scrape")
+log = logging.getLogger("meridian.scrape")
 _lock = Lock()
 _status = {"running": False, "collected": 0, "done": False, "error": None, "result": None}
 
@@ -91,7 +91,7 @@ def discover(payload: ScrapeRequest, background: BackgroundTasks, db: Session = 
     resume = db.get(Setting, "resume")
     if not resume or not resume.value.strip():
         raise HTTPException(
-            400, "Save your resume before discovering jobs so Hirelight can score matches."
+            400, "Save your resume before discovering jobs so Meridian can score matches."
         )
     with _lock:
         if _status["running"]:

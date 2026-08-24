@@ -4,7 +4,15 @@ export default {
   theme: {
     extend: {
       fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
-      colors: { ink: '#18231f', cream: '#f5f4ed', sage: '#4e715f', sun: '#e8ad4a' },
+      colors: {
+        ink: '#14213d',
+        paper: '#f5f7fb',
+        cream: '#fffaf0',
+        sage: '#2563eb',
+        sun: '#d89b24',
+        teal: '#168f83',
+        coral: '#df6c55',
+      },
     },
   },
   plugins: [],
