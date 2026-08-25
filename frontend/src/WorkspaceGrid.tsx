@@ -9,18 +9,18 @@ export default function WorkspaceGrid({ onOpen }: { onOpen: (workspace: Workspac
 
   return (
     <main className="mx-auto w-full max-w-[1500px] flex-1 space-y-7 px-5 py-10 lg:px-10">
-      <section className="border-b border-black/15 pb-7">
+      <section className="border-b border-fg/15 pb-7">
         <p className="eyebrow mb-3 w-fit">Your workspaces</p>
         <h1 className="font-display text-4xl font-extrabold tracking-[-0.045em] sm:text-5xl">
           Pick up where you left off.
         </h1>
-        <p className="mt-3 max-w-xl text-black/55">
+        <p className="mt-3 max-w-xl text-fg/65">
           Each workspace keeps its own resume, thresholds, and job pipeline — one per role focus or
           search track.
         </p>
       </section>
       {workspacesQ.isLoading ? (
-        <div className="p-12 text-center text-black/45">Loading your workspaces…</div>
+        <div className="p-12 text-center text-fg/65">Loading your workspaces…</div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {workspacesQ.data?.map((workspace) => (
@@ -31,7 +31,7 @@ export default function WorkspaceGrid({ onOpen }: { onOpen: (workspace: Workspac
             />
           ))}
           <button
-            className="card flex min-h-[180px] flex-col items-center justify-center gap-2 border-dashed text-black/40 transition hover:-translate-y-0.5 hover:border-sage hover:text-sage"
+            className="card flex min-h-[180px] flex-col items-center justify-center gap-2 border-dashed text-fg/65 transition hover:-translate-y-0.5 hover:border-accent hover:text-accent"
             onClick={() => setCreateOpen(true)}
             aria-label="Create new workspace"
           >
@@ -53,9 +53,9 @@ function WorkspaceCard({ workspace, onOpen }: { workspace: Workspace; onOpen: ()
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workspaces'] }),
   });
   return (
-    <article className="card group relative flex flex-col justify-between p-6 transition hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#2563eb]">
+    <article className="card group relative flex flex-col justify-between p-6 transition hover:-translate-y-0.5 hover:border-accent/40">
       <button
-        className="absolute right-3 top-3 rounded-lg p-1.5 text-black/30 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+        className="absolute right-3 top-3 rounded-lg p-1.5 text-fg/65 opacity-0 transition hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
         onClick={(e) => {
           e.stopPropagation();
           setConfirmDelete(true);
@@ -65,11 +65,11 @@ function WorkspaceCard({ workspace, onOpen }: { workspace: Workspace; onOpen: ()
         <Trash2 size={16} />
       </button>
       <button className="text-left" onClick={onOpen}>
-        <div className="mb-4 flex items-center gap-2 text-sage">
+        <div className="mb-4 flex items-center gap-2 text-accent">
           <BriefcaseBusiness size={20} />
         </div>
         <h3 className="font-display text-lg font-bold">{workspace.name}</h3>
-        <div className="mt-4 flex items-center gap-4 text-sm text-black/50">
+        <div className="mono-num mt-4 flex items-center gap-4 text-sm text-fg/65">
           <span>{workspace.job_count} jobs</span>
           <span className="flex items-center gap-1">
             <Target size={13} /> {workspace.above_threshold} strong
@@ -85,21 +85,21 @@ function WorkspaceCard({ workspace, onOpen }: { workspace: Workspace; onOpen: ()
           onMouseDown={(event) => event.target === event.currentTarget && setConfirmDelete(false)}
         >
           <div
-            className="w-full max-w-sm border-2 border-black bg-white p-6"
+            className="w-full max-w-sm border-2 border-fg bg-surface p-6"
             role="dialog"
             aria-modal="true"
           >
             <p className="font-display font-bold">Delete "{workspace.name}"?</p>
-            <p className="mt-2 text-sm text-black/55">
+            <p className="mt-2 text-sm text-fg/65">
               This permanently removes its resume, settings, and all {workspace.job_count} jobs.
             </p>
-            {deleteM.error && <p className="mt-2 text-sm text-red-600">{deleteM.error.message}</p>}
+            {deleteM.error && <p className="mt-2 text-sm text-danger">{deleteM.error.message}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-outline" onClick={() => setConfirmDelete(false)}>
                 Cancel
               </button>
               <button
-                className="btn bg-red-600 text-white hover:bg-red-700"
+                className="btn bg-danger text-white hover:brightness-110"
                 disabled={deleteM.isPending}
                 onClick={() => deleteM.mutate()}
               >
@@ -133,7 +133,7 @@ export function CreateWorkspaceDialog({ onClose }: { onClose: () => void }) {
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section
-        className="w-full max-w-md border-2 border-black bg-white p-7"
+        className="w-full max-w-md border-2 border-fg bg-surface p-7"
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-workspace-title"
@@ -149,7 +149,7 @@ export function CreateWorkspaceDialog({ onClose }: { onClose: () => void }) {
             <X size={19} />
           </button>
         </div>
-        <p className="mt-2 text-sm text-black/55">
+        <p className="mt-2 text-sm text-fg/65">
           Give it a name — you'll set its resume and search filters once it's open.
         </p>
         <form className="mt-6" onSubmit={submit}>
@@ -165,7 +165,7 @@ export function CreateWorkspaceDialog({ onClose }: { onClose: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          {createM.error && <p className="mt-2 text-sm text-red-600">{createM.error.message}</p>}
+          {createM.error && <p className="mt-2 text-sm text-danger">{createM.error.message}</p>}
           <button
             className="btn btn-dark mt-5 w-full py-3"
             type="submit"

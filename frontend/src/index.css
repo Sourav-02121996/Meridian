@@ -1,13 +1,34 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
+/* Fonts are loaded via <link> in index.html, not @import here — a CSS @import can't
+   start fetching until the browser has already parsed this stylesheet, which delays
+   the font and worsens the fallback-font layout shift on first load. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens. Values are space-separated RGB channels (not hex) so Tailwind's
+   rgb(var(--x) / <alpha-value>) pattern can still honor /NN opacity modifiers, e.g.
+   text-fg/55. `fg` doubles as text, border, and subtle-background-tint color in both
+   themes — it's dark-navy-on-light and near-white-on-dark, so a single token flips
+   correctly everywhere it's used instead of needing a dark: variant at every call site. */
 :root {
+  --paper: 245 247 251;
+  --surface: 255 255 255;
+  --surface-2: 240 241 245;
+  --fg: 20 33 61;
+  /* The app sidebar is a fixed dark band in both themes (per the reference designs),
+     but the exact shade still differs per theme so dark mode doesn't go pure black. */
+  --sidebar: 19 23 30;
   font-family: 'DM Sans', sans-serif;
-  color: #14213d;
-  background: #f5f7fb;
+  color: rgb(var(--fg));
+  background: rgb(var(--paper));
   font-synthesis: none;
+}
+.dark {
+  --paper: 10 11 15;
+  --surface: 21 23 29;
+  --surface-2: 30 33 41;
+  --fg: 232 234 240;
+  --sidebar: 26 29 38;
 }
 html {
   scroll-behavior: smooth;
@@ -16,7 +37,11 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f5f7fb;
+  background: rgb(var(--paper));
+  color: rgb(var(--fg));
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 button,
 input,
@@ -27,32 +52,45 @@ select {
 .font-display {
   font-family: 'Manrope', sans-serif;
 }
+.font-mono,
+.mono-num {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+.mono-num {
+  font-variant-numeric: tabular-nums;
+}
 .card {
-  @apply rounded-2xl border border-black/10 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.05)];
+  @apply rounded-2xl border border-fg/10 bg-surface;
 }
 .field {
-  @apply rounded-xl border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/10;
+  @apply rounded-xl border border-fg/15 bg-surface px-3 py-2 text-sm text-fg outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20;
 }
 .btn {
   @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50;
 }
 .btn-dark {
-  @apply bg-sage text-white hover:-translate-y-0.5 hover:bg-ink hover:shadow-[4px_4px_0_#d89b24];
+  @apply bg-accent text-white hover:-translate-y-0.5 hover:brightness-110;
 }
 .btn-outline {
-  @apply border border-black bg-white text-black hover:-translate-y-0.5 hover:bg-neutral-100;
+  @apply border border-fg/20 bg-transparent text-fg hover:-translate-y-0.5 hover:bg-fg/5;
 }
 .btn-large {
   @apply min-h-12 px-6 text-base;
 }
 .nav-link {
-  @apply rounded-lg px-3 py-2 text-sm font-semibold text-black/55 transition hover:bg-black/5 hover:text-black;
+  @apply rounded-lg px-3 py-2 text-sm font-semibold text-fg/55 transition hover:bg-fg/5 hover:text-fg;
 }
 .nav-link-active {
-  @apply bg-black/5 text-black;
+  @apply bg-fg/5 text-fg;
 }
 .icon-button {
-  @apply grid h-10 w-10 place-items-center rounded-xl border border-ink/15 transition hover:border-sage hover:bg-sage hover:text-white;
+  @apply grid h-10 w-10 place-items-center rounded-xl border border-fg/15 transition hover:border-accent hover:bg-accent hover:text-white;
+}
+.sidebar-item {
+  @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/60 transition hover:bg-white/5 hover:text-white;
+}
+.sidebar-item-active {
+  @apply bg-accent text-white hover:bg-accent hover:text-white;
 }
 .login-circle {
   width: 2.5rem;
@@ -63,24 +101,24 @@ select {
   overflow: hidden;
 }
 .dropdown-panel {
-  @apply absolute top-[calc(100%+0.7rem)] z-50 min-w-56 overflow-hidden rounded-xl border border-sage/20 bg-white py-2 shadow-[0_18px_45px_rgba(20,33,61,0.16)];
+  @apply absolute top-[calc(100%+0.7rem)] z-50 min-w-56 overflow-hidden rounded-xl border border-fg/10 bg-surface py-2 shadow-[0_16px_40px_rgba(0,0,0,0.18)];
 }
 .dropdown-item {
-  @apply flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-ink/70 transition hover:bg-sage/10 hover:text-sage;
+  @apply flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-fg/70 transition hover:bg-accent/10 hover:text-accent;
 }
 .eyebrow {
-  @apply inline-flex items-center gap-2 rounded-full border border-sun/40 bg-cream px-3 py-1.5 text-xs font-bold uppercase tracking-[0.13em] text-ink;
+  @apply inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/5 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.13em] text-fg;
 }
 .section-title {
   @apply max-w-2xl font-display text-4xl font-extrabold leading-tight tracking-[-0.045em] sm:text-5xl;
 }
 .hero-grid {
-  background-color: #f5f7fb;
+  background-color: rgb(var(--paper));
   background-image:
-    radial-gradient(circle at 88% 14%, rgba(216, 155, 36, 0.2), transparent 24%),
-    radial-gradient(circle at 8% 85%, rgba(37, 99, 235, 0.13), transparent 26%),
-    linear-gradient(rgba(37, 99, 235, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(37, 99, 235, 0.045) 1px, transparent 1px);
+    radial-gradient(circle at 88% 14%, rgba(216, 155, 36, 0.16), transparent 24%),
+    radial-gradient(circle at 8% 85%, rgba(37, 99, 235, 0.14), transparent 26%),
+    linear-gradient(rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.05) 1px, transparent 1px);
   background-size: 36px 36px;
 }
 .underlined-word {
@@ -94,7 +132,7 @@ select {
   right: 0;
   bottom: -8px;
   height: 7px;
-  background: linear-gradient(90deg, #2563eb, #168f83);
+  background: linear-gradient(90deg, #2563eb, #16a34a);
   transform: rotate(-1deg);
 }
 .dot-pattern {
@@ -102,22 +140,24 @@ select {
   background-size: 10px 10px;
 }
 .window-dot {
-  @apply block h-2.5 w-2.5 rounded-full bg-black/20;
+  @apply block h-2.5 w-2.5 rounded-full bg-fg/25;
 }
 .feature-card {
-  @apply border border-sage/15 bg-white p-7 transition duration-200 hover:-translate-y-1 hover:border-sage hover:shadow-[7px_7px_0_#2563eb];
+  @apply border border-fg/10 bg-surface p-7 transition duration-200 hover:-translate-y-1 hover:border-accent hover:shadow-[7px_7px_0_#2563eb];
 }
 .feature-card:nth-child(2) {
   border-top: 4px solid #d89b24;
 }
 .feature-card:nth-child(3) {
-  border-top: 4px solid #168f83;
+  border-top: 4px solid #16a34a;
 }
 .match-score {
   background: #2563eb;
 }
 .group:nth-child(2) > .match-score {
-  background: #168f83;
+  /* Darker than the success token so white text on it clears 4.5:1 (the plain success
+     green only reaches ~3.3:1 with white — fine for tinted badges, not solid fills). */
+  background: #15803d;
 }
 .group:nth-child(3) > .match-score {
   background: #d89b24;

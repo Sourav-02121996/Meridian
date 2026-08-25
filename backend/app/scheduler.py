@@ -28,12 +28,29 @@ log = logging.getLogger("meridian.scheduler")
 scheduler = BackgroundScheduler(timezone=timezone.utc)
 
 _INTERVAL_KWARGS = {"hour": {"hours": 1}, "day": {"days": 1}, "week": {"weeks": 1}}
+_MISFIRE_GRACE_SECONDS = 300
+
+
+def _is_missed_one_time(batch: Batch) -> bool:
+    """A one-off batch whose start_at has already passed beyond the misfire grace
+    window will never fire — APScheduler just drops it silently. Detect that case so
+    we can mark it completed instead of leaving it stuck looking "active" forever."""
+    if batch.interval_unit is not None:
+        return False
+    start_at = (
+        batch.start_at if batch.start_at.tzinfo else batch.start_at.replace(tzinfo=timezone.utc)
+    )
+    return (datetime.now(timezone.utc) - start_at).total_seconds() > _MISFIRE_GRACE_SECONDS
 
 
 def start() -> None:
     with SessionLocal() as db:
         for batch in db.scalars(select(Batch).where(Batch.status == BatchStatus.active)).all():
-            _schedule(batch)
+            if _is_missed_one_time(batch):
+                batch.status = BatchStatus.completed
+            else:
+                _schedule(batch)
+        db.commit()
     scheduler.start()
 
 
@@ -65,7 +82,7 @@ def _schedule(batch: Batch) -> None:
         replace_existing=True,
         # If the backend was down (or busy) past the scheduled time, catch up within 5
         # minutes; beyond that, skip rather than surprise the user with a very late run.
-        misfire_grace_time=300,
+        misfire_grace_time=_MISFIRE_GRACE_SECONDS,
     )
 
 

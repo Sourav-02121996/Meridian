@@ -1,19 +1,17 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import {
   ArrowRight,
-  BarChart3,
   Check,
   Compass,
   FileText,
   House,
   Info,
-  LayoutGrid,
   Mail,
   Menu,
-  MessageSquare,
-  Plus,
+  Moon,
   ShieldCheck,
   Sparkles,
+  Sun,
   Target,
   UserRound,
   X,
@@ -23,16 +21,26 @@ import WorkspaceGrid, { CreateWorkspaceDialog } from './WorkspaceGrid';
 import WorkspaceView from './WorkspaceView';
 import BatchesPage from './BatchesPage';
 import GlobalDashboard from './GlobalDashboard';
+import Sidebar, { AppView } from './Sidebar';
 import { Workspace } from './api';
+import { applyTheme, getPreferredTheme, Theme } from './theme';
 
-type View = 'home' | 'workspaces' | 'workspace' | 'batches' | 'dashboard';
+type View = 'home' | AppView;
 
 export default function Site() {
   const [email, setEmail] = useState(() => localStorage.getItem('meridian-email') ?? '');
-  const [view, setView] = useState<View>('home');
+  // A logged-in user reloading the page (or opening a fresh tab) should land back in the
+  // app, not the marketing home — this used to always default to 'home' regardless of
+  // whether a session was already stored, dropping you out of the app on every refresh.
+  const [view, setView] = useState<View>(() =>
+    localStorage.getItem('meridian-email') ? 'workspaces' : 'home',
+  );
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>(getPreferredTheme);
+  useEffect(() => applyTheme(theme), [theme]);
+  const toggleTheme = () => setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
 
   const openWorkspaces = () => (email ? setView('workspaces') : setLoginOpen(true));
   const openWorkspace = (workspace: Workspace) => {
@@ -55,31 +63,48 @@ export default function Site() {
     setView('home');
   };
 
+  const inApp = Boolean(email) && view !== 'home';
+
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
-      <Header
-        email={email}
-        onHome={() => (email ? setView('workspaces') : setView('home'))}
-        onSection={goToSection}
-        onWorkspaces={openWorkspaces}
-        onCreateWorkspace={() => (email ? setCreateWorkspaceOpen(true) : setLoginOpen(true))}
-        onBatches={() => (email ? setView('batches') : setLoginOpen(true))}
-        onDashboard={() => (email ? setView('dashboard') : setLoginOpen(true))}
-        onLogin={() => setLoginOpen(true)}
-        onLogout={logout}
-      />
-      {view === 'home' && <Home onStart={openWorkspaces} onLogin={() => setLoginOpen(true)} />}
-      {view === 'workspaces' && <WorkspaceGrid onOpen={openWorkspace} />}
-      {view === 'workspace' && activeWorkspace && (
-        <WorkspaceView
-          workspaceId={activeWorkspace.id}
-          workspaceName={activeWorkspace.name}
-          onBack={() => setView('workspaces')}
-        />
+    <div className="min-h-screen bg-paper text-fg">
+      {inApp ? (
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar
+            view={view as AppView}
+            onNavigate={setView}
+            onCreateWorkspace={() => setCreateWorkspaceOpen(true)}
+            onCreateBatch={() => setView('batches')}
+            email={email}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onLogout={logout}
+          />
+          <div className="h-full min-w-0 flex-1 overflow-y-auto">
+            {view === 'workspaces' && <WorkspaceGrid onOpen={openWorkspace} />}
+            {view === 'workspace' && activeWorkspace && (
+              <WorkspaceView
+                workspaceId={activeWorkspace.id}
+                workspaceName={activeWorkspace.name}
+                onBack={() => setView('workspaces')}
+              />
+            )}
+            {view === 'batches' && <BatchesPage />}
+            {view === 'dashboard' && <GlobalDashboard />}
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-h-screen flex-col">
+          <Header
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onHome={() => (email ? setView('workspaces') : setView('home'))}
+            onSection={goToSection}
+            onLogin={() => setLoginOpen(true)}
+          />
+          <Home onStart={openWorkspaces} onLogin={() => setLoginOpen(true)} />
+          <Footer onAbout={() => goToSection('about')} />
+        </div>
       )}
-      {view === 'batches' && <BatchesPage />}
-      {view === 'dashboard' && <GlobalDashboard />}
-      <Footer onAbout={() => goToSection('about')} />
       {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} onLogin={login} />}
       {createWorkspaceOpen && (
         <CreateWorkspaceDialog
@@ -99,7 +124,7 @@ function Brand() {
       <img
         src="/favicon-512.png"
         alt=""
-        className="h-10 w-10 rounded-xl border border-black/10 object-contain"
+        className="h-10 w-10 rounded-xl border border-fg/10 object-contain"
       />
       <span className="font-display text-xl font-extrabold tracking-[-0.04em]">Meridian</span>
     </span>
@@ -107,53 +132,37 @@ function Brand() {
 }
 
 function Header({
-  email,
+  theme,
+  onToggleTheme,
   onHome,
   onSection,
-  onWorkspaces,
-  onCreateWorkspace,
-  onBatches,
-  onDashboard,
   onLogin,
-  onLogout,
 }: {
-  email: string;
+  theme: Theme;
+  onToggleTheme: () => void;
   onHome: () => void;
   onSection: (id: string) => void;
-  onWorkspaces: () => void;
-  onCreateWorkspace: () => void;
-  onBatches: () => void;
-  onDashboard: () => void;
   onLogin: () => void;
-  onLogout: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
   const choose = (action: () => void) => {
     setMenuOpen(false);
-    setAccountOpen(false);
     action();
   };
   return (
-    <header className="sticky top-0 z-40 border-b border-black/10 bg-white/90 backdrop-blur-xl">
-      {(menuOpen || accountOpen) && (
+    <header className="sticky top-0 z-40 border-b border-fg/10 bg-surface/90 backdrop-blur-xl">
+      {menuOpen && (
         <button
           className="fixed inset-0 z-[-1] cursor-default"
           aria-label="Close menu"
-          onClick={() => {
-            setMenuOpen(false);
-            setAccountOpen(false);
-          }}
+          onClick={() => setMenuOpen(false)}
         />
       )}
       <div className="relative mx-auto flex h-16 max-w-[1500px] items-center gap-3 px-5 lg:px-10">
         <div className="relative">
           <button
             className="icon-button"
-            onClick={() => {
-              setMenuOpen((open) => !open);
-              setAccountOpen(false);
-            }}
+            onClick={() => setMenuOpen((open) => !open)}
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
           >
@@ -161,101 +170,42 @@ function Header({
           </button>
           {menuOpen && (
             <nav className="dropdown-panel left-0" aria-label="Navigation menu">
-              {email ? (
-                <>
-                  <button className="dropdown-item" onClick={() => choose(onWorkspaces)}>
-                    <House size={17} /> Home
-                  </button>
-                  <button className="dropdown-item" onClick={() => choose(onCreateWorkspace)}>
-                    <Plus size={17} /> Create new workspace
-                  </button>
-                  <button className="dropdown-item" onClick={() => choose(onBatches)}>
-                    <Zap size={17} /> Create batch
-                  </button>
-                  <button className="dropdown-item" onClick={() => choose(onDashboard)}>
-                    <BarChart3 size={17} /> Dashboard
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button className="dropdown-item" onClick={() => choose(onHome)}>
-                    <House size={17} /> Home
-                  </button>
-                  <button
-                    className="dropdown-item"
-                    onClick={() => choose(() => onSection('how-it-works'))}
-                  >
-                    <Compass size={17} /> How it works
-                  </button>
-                  <button
-                    className="dropdown-item"
-                    onClick={() => choose(() => onSection('about'))}
-                  >
-                    <Info size={17} /> About
-                  </button>
-                </>
-              )}
+              <button className="dropdown-item" onClick={() => choose(onHome)}>
+                <House size={17} /> Home
+              </button>
+              <button
+                className="dropdown-item"
+                onClick={() => choose(() => onSection('how-it-works'))}
+              >
+                <Compass size={17} /> How it works
+              </button>
+              <button className="dropdown-item" onClick={() => choose(() => onSection('about'))}>
+                <Info size={17} /> About
+              </button>
             </nav>
           )}
         </div>
         <button onClick={onHome} aria-label="Meridian home">
           <Brand />
         </button>
-        {email ? (
-          <div className="relative ml-auto flex items-center gap-2">
-            <button
-              className="icon-button login-circle"
-              onClick={() => {
-                setAccountOpen((open) => !open);
-                setMenuOpen(false);
-              }}
-              title="Account menu"
-              aria-label="Open account menu"
-              aria-expanded={accountOpen}
-            >
-              <UserRound size={19} />
-            </button>
-            {accountOpen && (
-              <div className="dropdown-panel right-0 w-64">
-                <div className="border-b border-black/10 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-black/40">
-                    Signed in as
-                  </p>
-                  <p className="mt-1 truncate text-sm font-bold">{email}</p>
-                </div>
-                <div className="p-2">
-                  <button className="dropdown-item" onClick={() => choose(onWorkspaces)}>
-                    <LayoutGrid size={17} /> Workspaces
-                  </button>
-                  <a
-                    className="dropdown-item"
-                    href="mailto:hello@meridian.app?subject=Meridian feedback"
-                    onClick={() => setAccountOpen(false)}
-                  >
-                    <MessageSquare size={17} /> Feedback
-                  </a>
-                </div>
-                <div className="border-t border-black/10 p-2">
-                  <button
-                    className="dropdown-item text-red-700 hover:bg-red-50"
-                    onClick={() => choose(onLogout)}
-                  >
-                    <UserRound size={17} /> Log out
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
+        <div className="ml-auto flex items-center gap-2">
           <button
-            className="icon-button login-circle ml-auto border-sage bg-sage text-white hover:bg-ink"
+            className="icon-button"
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label="Toggle color theme"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <button
+            className="icon-button login-circle border-accent bg-accent text-white hover:brightness-110"
             onClick={onLogin}
             title="Login"
             aria-label="Login"
           >
             <UserRound size={19} />
           </button>
-        )}
+        </div>
       </div>
     </header>
   );
@@ -289,7 +239,7 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
   ];
   return (
     <main className="flex-1 overflow-hidden">
-      <section className="hero-grid border-b border-black/10">
+      <section className="hero-grid border-b border-fg/10">
         <div className="mx-auto grid min-h-[680px] max-w-[1500px] items-center gap-14 px-5 py-20 lg:grid-cols-[1.08fr_.92fr] lg:px-10">
           <div className="relative z-10">
             <div className="eyebrow mb-7 w-fit">
@@ -298,7 +248,7 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
             <h1 className="max-w-4xl font-display text-5xl font-extrabold leading-[.94] tracking-[-0.065em] sm:text-7xl lg:text-[92px]">
               Find work that <span className="underlined-word">fits.</span>
             </h1>
-            <p className="mt-8 max-w-xl text-lg leading-8 text-black/60 sm:text-xl">
+            <p className="mt-8 max-w-xl text-lg leading-8 text-fg/65 sm:text-xl">
               Meridian turns a noisy job search into a focused pipeline—matching opportunities to
               your experience and showing you where to improve.
             </p>
@@ -310,7 +260,7 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
                 See how it works
               </a>
             </div>
-            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-black/55">
+            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-fg/65">
               {['Private by design', 'Clear match insights', 'You stay in control'].map((item) => (
                 <span className="flex items-center gap-2" key={item}>
                   <Check size={16} />
@@ -320,30 +270,30 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
             </div>
           </div>
           <div className="relative mx-auto w-full max-w-xl lg:mx-0">
-            <div className="absolute -left-8 -top-8 h-28 w-28 rounded-full border border-black/20 bg-white dot-pattern" />
-            <div className="relative rotate-1 border-2 border-black bg-white p-4 shadow-[14px_14px_0_#111] sm:p-6">
-              <div className="flex items-center justify-between border-b border-black/10 pb-4">
+            <div className="absolute -left-8 -top-8 h-28 w-28 rounded-full border border-fg/20 bg-surface dot-pattern" />
+            <div className="relative rotate-1 border-2 border-fg bg-surface p-4 shadow-[14px_14px_0_rgb(var(--fg))] sm:p-6">
+              <div className="flex items-center justify-between border-b border-fg/10 pb-4">
                 <div className="flex gap-2">
                   <i className="window-dot" />
                   <i className="window-dot" />
                   <i className="window-dot" />
                 </div>
-                <span className="text-xs font-bold uppercase tracking-[.2em] text-black/45">
+                <span className="text-xs font-bold uppercase tracking-[.2em] text-fg/65">
                   Your next move
                 </span>
               </div>
               <div className="space-y-4 py-5">
                 {matches.map(([score, role, company]) => (
                   <div
-                    className="group flex items-center gap-4 border border-black/10 p-4 transition hover:-translate-y-1 hover:border-black hover:shadow-[5px_5px_0_#111]"
+                    className="group flex items-center gap-4 border border-fg/10 p-4 transition hover:-translate-y-1 hover:border-fg hover:shadow-[5px_5px_0_rgb(var(--fg))]"
                     key={role}
                   >
-                    <span className="match-score grid h-12 w-12 shrink-0 place-items-center rounded-full font-display text-lg font-extrabold text-white">
+                    <span className="match-score mono-num grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-bold text-white">
                       {score}
                     </span>
                     <div className="min-w-0">
                       <p className="truncate font-bold">{role}</p>
-                      <p className="text-sm text-black/45">{company}</p>
+                      <p className="text-sm text-fg/65">{company}</p>
                     </div>
                     <ArrowRight
                       className="ml-auto transition group-hover:translate-x-1"
@@ -357,7 +307,7 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
                 <Sparkles size={17} />
               </div>
             </div>
-            <div className="absolute -bottom-7 -left-5 -rotate-3 border border-black bg-white px-4 py-3 text-sm font-bold shadow-[4px_4px_0_#111]">
+            <div className="absolute -bottom-7 -left-5 -rotate-3 border border-fg bg-surface px-4 py-3 text-sm font-bold shadow-[4px_4px_0_rgb(var(--fg))]">
               No endless tabs ✦
             </div>
           </div>
@@ -369,14 +319,14 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
           • SCORE SMARTER • APPLY WITH INTENT •
         </div>
       </div>
-      <section id="how-it-works" className="scroll-mt-24 border-b border-black/10 bg-white py-24">
+      <section id="how-it-works" className="scroll-mt-24 border-b border-fg/10 bg-surface py-24">
         <div className="mx-auto max-w-[1300px] px-5 lg:px-10">
           <div className="mb-14 flex flex-col justify-between gap-5 md:flex-row md:items-end">
             <div>
               <p className="eyebrow mb-4 w-fit">A clearer process</p>
               <h2 className="section-title">From résumé to shortlist.</h2>
             </div>
-            <p className="max-w-md text-black/55">
+            <p className="max-w-md text-fg/65">
               Three focused steps replace spreadsheet chaos and help you spend time on roles that
               deserve it.
             </p>
@@ -386,12 +336,15 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
               <article className="feature-card" key={number}>
                 <div className="flex items-start justify-between">
                   <Icon size={30} />
-                  <span className="font-display text-5xl font-extrabold text-black/10">
+                  <span
+                    className="font-display text-5xl font-extrabold text-fg/10"
+                    aria-hidden="true"
+                  >
                     {number}
                   </span>
                 </div>
                 <h3 className="mt-12 font-display text-2xl font-bold tracking-tight">{title}</h3>
-                <p className="mt-3 leading-7 text-black/55">{copy}</p>
+                <p className="mt-3 leading-7 text-fg/65">{copy}</p>
               </article>
             ))}
           </div>
@@ -403,12 +356,12 @@ function Home({ onStart, onLogin }: { onStart: () => void; onLogin: () => void }
             <p className="eyebrow mb-4 w-fit">Why Meridian</p>
             <h2 className="section-title">Career tools should feel human.</h2>
           </div>
-          <div className="border-l-2 border-black pl-7 text-xl leading-9 text-black/65 sm:text-2xl">
+          <div className="border-l-2 border-fg pl-7 text-xl leading-9 text-fg/65 sm:text-2xl">
             Built for students and early-career talent who want useful signals—not more noise.
             Meridian keeps applications manual, decisions yours, and the experience refreshingly
             clear.
             <button
-              className="mt-8 flex items-center gap-2 text-base font-bold text-black"
+              className="mt-8 flex items-center gap-2 text-base font-bold text-fg"
               onClick={onLogin}
             >
               Login to your workspace <ArrowRight size={18} />
@@ -438,7 +391,7 @@ function LoginDialog({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section
-        className="w-full max-w-md border-2 border-black bg-white p-7 shadow-[10px_10px_0_rgba(255,255,255,.35)]"
+        className="w-full max-w-md border-2 border-fg bg-surface p-7 shadow-[10px_10px_0_rgba(255,255,255,.35)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="login-title"
@@ -452,7 +405,7 @@ function LoginDialog({
         <h2 id="login-title" className="mt-8 font-display text-3xl font-extrabold tracking-tight">
           Welcome to Meridian.
         </h2>
-        <p className="mt-2 text-sm leading-6 text-black/55">
+        <p className="mt-2 text-sm leading-6 text-fg/65">
           Enter any valid email to continue. Verification will be added in a future release.
         </p>
         <form className="mt-7" onSubmit={submit}>
@@ -460,7 +413,7 @@ function LoginDialog({
             Email address
           </label>
           <div className="field mt-2 flex items-center gap-2">
-            <Mail size={17} className="text-black/40" />
+            <Mail size={17} className="text-fg/65" />
             <input
               id="login-email"
               className="min-w-0 flex-1 bg-transparent outline-none"
@@ -476,7 +429,7 @@ function LoginDialog({
             Continue <ArrowRight size={17} />
           </button>
         </form>
-        <p className="mt-5 flex items-center gap-2 text-xs text-black/40">
+        <p className="mt-5 flex items-center gap-2 text-xs text-fg/65">
           <ShieldCheck size={15} /> Prototype login · stored only in this browser
         </p>
       </section>

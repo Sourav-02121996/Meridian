@@ -46,14 +46,22 @@ const reviewReasonLabels: Record<string, string> = {
   custom_questions: 'Form has custom questions',
   form_error: "Couldn't confirm submission",
 };
-const colors = ['#2563eb', '#d89b24', '#168f83', '#df6c55'];
+const colors = ['#2563eb', '#d89b24', '#16a34a', '#dc2626'];
+const axisTick = { fontSize: 11, fill: 'rgb(var(--fg) / 0.45)' };
+const tooltipStyle = {
+  background: 'rgb(var(--surface))',
+  border: '1px solid rgb(var(--fg) / 0.1)',
+  borderRadius: 8,
+  color: 'rgb(var(--fg))',
+  fontSize: 13,
+};
 
 function scoreTone(score: number, threshold: number) {
   return score >= threshold
-    ? 'bg-sage text-white'
+    ? 'bg-accent text-white'
     : score >= Math.max(0, threshold - 17)
-      ? 'bg-sun/20 text-amber-900'
-      : 'bg-neutral-100 text-neutral-600';
+      ? 'bg-warning/20 text-warning'
+      : 'bg-fg/5 text-fg/65';
 }
 
 function WorkspaceView({
@@ -117,9 +125,9 @@ function WorkspaceView({
   });
   return (
     <main className="mx-auto w-full max-w-[1500px] flex-1 space-y-7 px-5 py-10 lg:px-10">
-      <section className="border-b border-black/15 pb-7">
+      <section className="border-b border-fg/15 pb-7">
         <button
-          className="mb-4 flex items-center gap-2 text-sm font-semibold text-black/50 hover:text-black"
+          className="mb-4 flex items-center gap-2 text-sm font-semibold text-fg/65 hover:text-fg"
           onClick={onBack}
         >
           <ArrowLeft size={16} /> All workspaces
@@ -142,7 +150,7 @@ function WorkspaceView({
       <ProfilePanel workspaceId={workspaceId} settings={settingsQ.data} />
       <div className="grid gap-5 md:grid-cols-2">
         <ThresholdCard
-          icon={<Target className="text-sage" />}
+          icon={<Target className="text-accent" />}
           title="Your match threshold"
           hint="Jobs at or above this score are highlighted"
           value={threshold}
@@ -150,7 +158,7 @@ function WorkspaceView({
           onCommit={(value) => thresholdM.mutate(value)}
         />
         <ThresholdCard
-          icon={<Sparkles className="text-sage" />}
+          icon={<Sparkles className="text-accent" />}
           title="Auto-apply threshold"
           hint="Batches only submit automatically at or above this score"
           value={autoApplyThreshold}
@@ -161,14 +169,14 @@ function WorkspaceView({
       <StatCards stats={statsQ.data} />
       <Charts stats={statsQ.data} />
       <section className="card overflow-hidden">
-        <div className="border-b border-black/5 p-5">
+        <div className="border-b border-fg/10 p-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="font-display text-xl font-bold">Job pipeline</h2>
-              <p className="text-sm text-black/45">Review matches and keep your search moving.</p>
+              <p className="text-sm text-fg/65">Review matches and keep your search moving.</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-black/45">
+              <span className="mono-num text-sm font-medium text-fg/65">
                 {jobsQ.data?.length ?? 0} jobs
               </span>
               <ExportButton workspaceId={workspaceId} params={params} />
@@ -216,12 +224,12 @@ function WorkspaceView({
               <option value="date-asc">Oldest first</option>
             </select>
           </div>
-          <p className="mt-2 text-right text-xs text-black/35">
+          <p className="mt-2 text-right text-xs text-fg/65">
             Excel export reflects the active status, score, and search filters.
           </p>
         </div>
         {jobsQ.isLoading ? (
-          <div className="p-12 text-center text-black/45">Loading your pipeline…</div>
+          <div className="p-12 text-center text-fg/65">Loading your pipeline…</div>
         ) : jobsQ.isError ? (
           <ErrorBox error={jobsQ.error} />
         ) : jobsQ.data?.length ? (
@@ -233,9 +241,9 @@ function WorkspaceView({
           />
         ) : (
           <div className="p-16 text-center">
-            <BriefcaseBusiness className="mx-auto mb-3 text-black/25" size={40} />
+            <BriefcaseBusiness className="mx-auto mb-3 text-fg/65" size={40} />
             <p className="font-display font-bold">No jobs here yet</p>
-            <p className="mt-1 text-sm text-black/45">
+            <p className="mt-1 text-sm text-fg/65">
               Save your resume, then discover your first batch of roles.
             </p>
           </div>
@@ -265,10 +273,10 @@ function ThresholdCard({
       {icon}
       <div>
         <p className="font-semibold">{title}</p>
-        <p className="text-xs text-black/45">{hint}</p>
+        <p className="text-xs text-fg/65">{hint}</p>
       </div>
       <input
-        className="min-w-48 flex-1 accent-[#2563eb]"
+        className="min-w-48 flex-1 accent-accent"
         aria-label={title}
         type="range"
         min="0"
@@ -281,7 +289,7 @@ function ThresholdCard({
             onCommit(+(e.currentTarget as HTMLInputElement).value);
         }}
       />
-      <span className="rounded-xl bg-sage px-3 py-1.5 font-display font-bold text-white">
+      <span className="mono-num rounded-xl bg-accent px-3 py-1.5 font-bold text-white">
         {value}
       </span>
     </div>
@@ -320,18 +328,18 @@ function ResumePanel({
   return (
     <section className="card p-6">
       <div className="mb-4 flex items-start gap-3">
-        <div className="rounded-xl bg-sage/10 p-2 text-sage">
+        <div className="rounded-xl bg-accent/10 p-2 text-accent">
           <FileText size={20} />
         </div>
         <div>
           <h2 className="font-display font-bold">Your resume</h2>
-          <p className="text-sm text-black/45">
+          <p className="text-sm text-fg/65">
             Paste text or upload a text-based PDF. Uploading a PDF also keeps the original file on
             hand so batches can attach it when auto-applying.
           </p>
         </div>
       </div>
-      <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-sage/40 bg-sage/5 px-4 py-3 text-sm font-semibold text-sage transition hover:bg-sage/10">
+      <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-accent/40 bg-accent/5 px-4 py-3 text-sm font-semibold text-accent transition hover:bg-accent/10">
         <Upload size={17} />
         {uploadM.isPending ? 'Extracting PDF…' : 'Upload resume PDF'}
         <input
@@ -342,10 +350,8 @@ function ResumePanel({
           onChange={(e) => choose(e.target.files?.[0])}
         />
       </label>
-      {uploadM.error && <p className="mb-3 text-sm text-red-600">{uploadM.error.message}</p>}
-      {uploadMessage && (
-        <p className="mb-3 text-sm font-medium text-neutral-700">{uploadMessage}</p>
-      )}
+      {uploadM.error && <p className="mb-3 text-sm text-danger">{uploadM.error.message}</p>}
+      {uploadMessage && <p className="mb-3 text-sm font-medium text-fg/70">{uploadMessage}</p>}
       <textarea
         className="field h-36 w-full resize-none"
         placeholder="Paste your resume text here…"
@@ -353,12 +359,10 @@ function ResumePanel({
         onChange={(e) => setValue(e.target.value)}
       />
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs text-black/35">{value.length.toLocaleString()} characters</span>
-        <button
-          className="btn bg-ink text-white hover:bg-sage"
-          disabled={saving || !value.trim()}
-          onClick={onSave}
-        >
+        <span className="mono-num text-xs text-fg/65">
+          {value.length.toLocaleString()} characters
+        </span>
+        <button className="btn btn-dark" disabled={saving || !value.trim()} onClick={onSave}>
           {saving ? 'Saving…' : 'Save resume'}
         </button>
       </div>
@@ -402,12 +406,12 @@ function ProfilePanel({
   return (
     <section className="card p-6">
       <div className="mb-4 flex items-start gap-3">
-        <div className="rounded-xl bg-sage/10 p-2 text-sage">
+        <div className="rounded-xl bg-accent/10 p-2 text-accent">
           <UserRound size={20} />
         </div>
         <div>
           <h2 className="font-display font-bold">Applicant profile</h2>
-          <p className="text-sm text-black/45">
+          <p className="text-sm text-fg/65">
             Used to fill standard fields when a batch auto-applies on your behalf.
           </p>
         </div>
@@ -446,11 +450,7 @@ function ProfilePanel({
         onChange={(e) => setCoverLetter(e.target.value)}
       />
       <div className="mt-3 flex justify-end">
-        <button
-          className="btn bg-ink text-white hover:bg-sage"
-          onClick={() => saveM.mutate()}
-          disabled={saveM.isPending}
-        >
+        <button className="btn btn-dark" onClick={() => saveM.mutate()} disabled={saveM.isPending}>
           {saveM.isPending ? 'Saving…' : 'Save profile'}
         </button>
       </div>
@@ -488,12 +488,12 @@ function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => 
   return (
     <section className="card p-6">
       <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-xl bg-black/5 p-2 text-black">
+        <div className="rounded-xl bg-fg/5 p-2 text-fg">
           <Sparkles size={20} />
         </div>
         <div>
           <h2 className="font-display font-bold">Discover opportunities</h2>
-          <p className="text-sm text-black/45">
+          <p className="text-sm text-fg/65">
             Crawl HiringCafe in Chromium and score every role against your resume.
           </p>
         </div>
@@ -506,7 +506,7 @@ function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => 
           aria-label="Search query"
         />
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs font-semibold text-black/50">
+          <label className="text-xs font-semibold text-fg/65">
             Past days
             <input
               className="field mt-1 w-full"
@@ -517,7 +517,7 @@ function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => 
               onChange={(e) => setDays(+e.target.value)}
             />
           </label>
-          <label className="text-xs font-semibold text-black/50">
+          <label className="text-xs font-semibold text-fg/65">
             Maximum jobs
             <input
               className="field mt-1 w-full"
@@ -529,11 +529,12 @@ function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => 
             />
           </label>
         </div>
-        <button className="btn w-full bg-sage text-white hover:bg-ink" disabled={busy}>
+        <button className="btn btn-dark w-full" disabled={busy}>
           {busy ? (
             <>
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              Collected {statusQ.data?.collected ?? 0} · crawling/scoring…
+              <span className="mono-num">Collected {statusQ.data?.collected ?? 0}</span> ·
+              crawling/scoring…
             </>
           ) : (
             <>
@@ -543,10 +544,10 @@ function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => 
           )}
         </button>
         {(mutation.error || statusQ.data?.error) && (
-          <p className="text-sm text-red-600">{mutation.error?.message || statusQ.data?.error}</p>
+          <p className="text-sm text-danger">{mutation.error?.message || statusQ.data?.error}</p>
         )}
         {result && !polling && (
-          <p className="text-sm font-medium text-neutral-700">
+          <p className="mono-num text-sm font-medium text-fg/70">
             {result.fetched} fetched · {result.new} new · {result.above_threshold} strong matches
           </p>
         )}
@@ -569,7 +570,7 @@ function ExportButton({ workspaceId, params }: { workspaceId: number; params: UR
   });
   return (
     <button
-      className="btn bg-sage/10 text-sage hover:bg-sage hover:text-white"
+      className="btn bg-accent/10 text-accent hover:bg-accent hover:text-white"
       disabled={mutation.isPending}
       onClick={() => mutation.mutate()}
     >
@@ -590,12 +591,12 @@ function StatCards({ stats }: any) {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map(([Icon, label, value]: any) => (
         <div className="card flex items-center gap-4 p-5" key={label}>
-          <div className="rounded-2xl bg-sage/10 p-3 text-sage">
+          <div className="rounded-2xl bg-accent/10 p-3 text-accent">
             <Icon size={22} />
           </div>
           <div>
-            <p className="text-sm text-black/45">{label}</p>
-            <p className="font-display text-2xl font-extrabold">{value}</p>
+            <p className="text-sm text-fg/65">{label}</p>
+            <p className="mono-num text-2xl font-bold">{value}</p>
           </div>
         </div>
       ))}
@@ -614,28 +615,38 @@ function Charts({ stats }: any) {
     <div className="grid gap-5 lg:grid-cols-2">
       <Chart title="Score distribution">
         <BarChart data={stats?.score_histogram ?? []}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8e9e4" />
-          <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-          <Tooltip />
-          <Bar name="Jobs" dataKey="count" fill="#2563eb" radius={[5, 5, 0, 0]} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="currentColor"
+            strokeOpacity={0.1}
+          />
+          <XAxis dataKey="bucket" tick={axisTick} />
+          <YAxis allowDecimals={false} tick={axisTick} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Bar name="Jobs" dataKey="count" fill="#2563eb" radius={[3, 3, 0, 0]} />
         </BarChart>
       </Chart>
       <Chart title="Jobs by ATS">
         <BarChart data={stats?.by_ats ?? []}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8e9e4" />
-          <XAxis dataKey="ats" tick={{ fontSize: 10 }} />
-          <YAxis yAxisId="count" allowDecimals={false} tick={{ fontSize: 11 }} />
-          <YAxis yAxisId="score" orientation="right" domain={[0, 100]} tick={{ fontSize: 11 }} />
-          <Tooltip />
-          <Legend />
-          <Bar yAxisId="count" name="Jobs" dataKey="count" fill="#d89b24" radius={[5, 5, 0, 0]} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="currentColor"
+            strokeOpacity={0.1}
+          />
+          <XAxis dataKey="ats" tick={{ ...axisTick, fontSize: 10 }} />
+          <YAxis yAxisId="count" allowDecimals={false} tick={axisTick} />
+          <YAxis yAxisId="score" orientation="right" domain={[0, 100]} tick={axisTick} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Legend wrapperStyle={{ color: 'rgb(var(--fg) / 0.7)', fontSize: 12 }} />
+          <Bar yAxisId="count" name="Jobs" dataKey="count" fill="#d89b24" radius={[3, 3, 0, 0]} />
           <Bar
             yAxisId="score"
             name="Avg score"
             dataKey="avg_score"
-            fill="#168f83"
-            radius={[5, 5, 0, 0]}
+            fill="#16a34a"
+            radius={[3, 3, 0, 0]}
           />
         </BarChart>
       </Chart>
@@ -653,21 +664,26 @@ function Charts({ stats }: any) {
               <Cell key={i} fill={colors[i % colors.length]} />
             ))}
           </Pie>
-          <Tooltip />
+          <Tooltip contentStyle={tooltipStyle} />
         </PieChart>
       </Chart>
       <Chart title="Applications over time">
         <LineChart data={stats?.applied_over_time ?? []}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8e9e4" />
-          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-          <Tooltip />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="currentColor"
+            strokeOpacity={0.1}
+          />
+          <XAxis dataKey="date" tick={{ ...axisTick, fontSize: 10 }} />
+          <YAxis allowDecimals={false} tick={axisTick} />
+          <Tooltip contentStyle={tooltipStyle} />
           <Line
             name="Applications"
             type="monotone"
             dataKey="count"
             stroke="#2563eb"
-            strokeWidth={3}
+            strokeWidth={2.5}
             dot={{ fill: '#d89b24' }}
           />
         </LineChart>
@@ -701,7 +717,7 @@ function JobTable({
 }) {
   return (
     <div>
-      <div className="hidden grid-cols-[72px_1fr_1fr_110px_130px_32px] gap-3 border-b border-black/5 bg-black/[.02] px-5 py-2 text-xs font-bold uppercase tracking-wider text-black/40 md:grid">
+      <div className="hidden grid-cols-[72px_1fr_1fr_110px_130px_32px] gap-3 border-b border-fg/10 bg-fg/[.03] px-5 py-2 text-xs font-bold uppercase tracking-wider text-fg/65 md:grid">
         <span>Score</span>
         <span>Title</span>
         <span>Company</span>
@@ -709,7 +725,7 @@ function JobTable({
         <span>Status</span>
         <span />
       </div>
-      <div className="divide-y divide-black/5">
+      <div className="divide-y divide-fg/10">
         {jobs.map((job) => (
           <JobRow
             job={job}
@@ -751,31 +767,31 @@ function JobRow({
     onSettled: onChanged,
   });
   return (
-    <article className={job.score >= threshold ? 'bg-neutral-100/70' : ''}>
+    <article className={job.score >= threshold ? 'bg-fg/[.03]' : ''}>
       <div className="grid items-center gap-3 px-5 py-4 md:grid-cols-[72px_1fr_1fr_110px_130px_32px]">
         <span
-          className={`w-fit rounded-xl px-3 py-2 font-display text-sm font-extrabold ${scoreTone(job.score, threshold)}`}
+          className={`mono-num w-fit rounded-lg px-3 py-2 text-sm font-bold ${scoreTone(job.score, threshold)}`}
         >
           {job.score}
         </span>
         <div>
           <p className="font-semibold">{job.title}</p>
-          <p className="mt-0.5 text-xs text-black/40">
+          <p className="mono-num mt-0.5 text-xs text-fg/65">
             Fetched {new Date(job.date_fetched).toLocaleDateString()}
           </p>
           {job.auto_apply_state === 'applied_auto' && (
-            <span className="mt-1 inline-block rounded-full bg-teal/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-teal">
+            <span className="mt-1 inline-block rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-success">
               Auto-applied
             </span>
           )}
           {job.auto_apply_state === 'needs_review' && (
-            <span className="mt-1 inline-block rounded-full bg-sun/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-900">
+            <span className="mt-1 inline-block rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warning">
               Needs review · {reviewReasonLabels[job.review_reason ?? ''] ?? job.review_reason}
             </span>
           )}
         </div>
-        <p className="text-sm font-medium text-black/65">{job.company}</p>
-        <span className="w-fit rounded-full bg-neutral-100 px-2.5 py-1 text-xs capitalize text-neutral-600">
+        <p className="text-sm font-medium text-fg/65">{job.company}</p>
+        <span className="w-fit rounded-full bg-fg/5 px-2.5 py-1 text-xs capitalize text-fg/65">
           {job.ats_platform}
         </span>
         <select
@@ -792,7 +808,7 @@ function JobRow({
           ))}
         </select>
         <button
-          className="rounded-lg p-1 hover:bg-black/5"
+          className="rounded-lg p-1 hover:bg-fg/5"
           onClick={() => setOpen(!open)}
           aria-expanded={open}
           aria-label={`Toggle details for ${job.title}`}
@@ -801,59 +817,54 @@ function JobRow({
         </button>
       </div>
       {open && (
-        <div className="border-t border-black/5 bg-white/70 px-5 py-5">
-          <div className="mb-5 grid gap-3 rounded-xl bg-neutral-100 p-3 text-sm sm:grid-cols-3">
-            <span>
+        <div className="border-t border-fg/10 bg-fg/[.02] px-5 py-5">
+          <div className="mono-num mb-5 grid gap-3 rounded-xl bg-fg/5 p-3 text-sm sm:grid-cols-3">
+            <span className="font-sans">
               Requirements <b>{Math.round(job.requirement_coverage * 100)}%</b>
             </span>
-            <span>
+            <span className="font-sans">
               Skills <b>{Math.round(job.skill_coverage * 100)}%</b>
             </span>
-            <span>
+            <span className="font-sans">
               Overall similarity <b>{Math.round(job.global_similarity * 100)}%</b>
             </span>
           </div>
           <div className="grid gap-6 lg:grid-cols-2">
             <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-black/40">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-fg/65">
                 Missing skills
               </p>
               <div className="flex flex-wrap gap-2">
                 {job.missing_skills.length ? (
                   job.missing_skills.map((s) => (
-                    <span
-                      className="rounded-lg bg-neutral-200 px-2 py-1 text-xs text-neutral-700"
-                      key={s}
-                    >
+                    <span className="rounded-lg bg-fg/10 px-2 py-1 text-xs text-fg/70" key={s}>
                       {s}
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm font-medium text-neutral-700">
-                    No obvious skill gaps
-                  </span>
+                  <span className="text-sm font-medium text-fg/70">No obvious skill gaps</span>
                 )}
               </div>
             </div>
             <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-black/40">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-fg/65">
                 Weak requirements
               </p>
               {job.weak_requirements.length ? (
-                <ul className="max-h-40 list-disc space-y-1 overflow-auto pl-5 text-sm text-black/60">
+                <ul className="max-h-40 list-disc space-y-1 overflow-auto pl-5 text-sm text-fg/65">
                   {job.weak_requirements.map((r, i) => (
                     <li key={i}>{r}</li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm font-medium text-neutral-700">Strong requirement coverage</p>
+                <p className="text-sm font-medium text-fg/70">Strong requirement coverage</p>
               )}
             </div>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             {job.apply_url ? (
               <a
-                className="btn bg-ink text-white hover:bg-sage"
+                className="btn bg-fg text-paper hover:brightness-110"
                 href={job.apply_url}
                 target="_blank"
                 rel="noreferrer"
@@ -862,32 +873,30 @@ function JobRow({
                 Open original posting
               </a>
             ) : (
-              <span className="text-sm text-neutral-600">
-                No external posting URL was provided.
-              </span>
+              <span className="text-sm text-fg/65">No external posting URL was provided.</span>
             )}
             <button
-              className="btn bg-black text-white hover:bg-neutral-800"
+              className="btn bg-fg text-paper hover:brightness-110"
               disabled={patch.isPending}
               onClick={() => patch.mutate('applied')}
             >
               Mark applied
             </button>
             <button
-              className="btn bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+              className="btn bg-fg/5 text-fg/65 hover:bg-fg/10"
               disabled={patch.isPending}
               onClick={() => patch.mutate('skipped')}
             >
               Skip
             </button>
           </div>
-          {patch.error && <p className="mt-3 text-sm text-red-600">{patch.error.message}</p>}
+          {patch.error && <p className="mt-3 text-sm text-danger">{patch.error.message}</p>}
         </div>
       )}
     </article>
   );
 }
 function ErrorBox({ error }: { error: Error }) {
-  return <div className="m-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error.message}</div>;
+  return <div className="m-5 rounded-xl bg-danger/10 p-4 text-sm text-danger">{error.message}</div>;
 }
 export default WorkspaceView;
