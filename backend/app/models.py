@@ -70,6 +70,25 @@ class Workspace(Base):
     profile_email: Mapped[str] = mapped_column(String(320), default="")
     profile_phone: Mapped[str] = mapped_column(String(50), default="")
     profile_linkedin: Mapped[str] = mapped_column(String(300), default="")
+    profile_portfolio_url: Mapped[str] = mapped_column(String(300), default="")
+    profile_github_url: Mapped[str] = mapped_column(String(300), default="")
+    profile_location: Mapped[str] = mapped_column(String(200), default="")
+    profile_current_company: Mapped[str] = mapped_column(String(200), default="")
+    profile_current_title: Mapped[str] = mapped_column(String(200), default="")
+    profile_desired_salary: Mapped[str] = mapped_column(String(100), default="")
+    profile_start_date: Mapped[str] = mapped_column(String(100), default="")
+    # Eligibility answers, stored as "Yes" / "No" / "" (unanswered) rather than a strict
+    # boolean so an unfilled field is distinguishable from an explicit "No".
+    profile_work_authorized: Mapped[str] = mapped_column(String(10), default="")
+    profile_visa_sponsorship: Mapped[str] = mapped_column(String(10), default="")
+    profile_willing_to_relocate: Mapped[str] = mapped_column(String(10), default="")
+    profile_18_or_older: Mapped[str] = mapped_column(String(10), default="")
+    # Voluntary self-identification — legally protected characteristics. Left blank by
+    # default and never inferred or guessed; only sent to a form if explicitly filled in.
+    profile_gender: Mapped[str] = mapped_column(String(100), default="")
+    profile_race_ethnicity: Mapped[str] = mapped_column(String(100), default="")
+    profile_veteran_status: Mapped[str] = mapped_column(String(100), default="")
+    profile_disability_status: Mapped[str] = mapped_column(String(100), default="")
     cover_letter: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -142,6 +161,13 @@ class Batch(Base):
     query: Mapped[str] = mapped_column(String(300), default="Software Engineer")
     days: Mapped[int] = mapped_column(Integer, default=2)
     max_jobs: Mapped[int] = mapped_column(Integer, default=100)
+    # Boolean-query HiringCafe filters — title-only, tech/tools mentioned in the posting,
+    # and full description respectively. Empty string means "not set" for all three.
+    job_title_query: Mapped[str] = mapped_column(Text, default="")
+    technology_keywords_query: Mapped[str] = mapped_column(Text, default="")
+    job_description_query: Mapped[str] = mapped_column(Text, default="")
+    departments: Mapped[list] = mapped_column(JSON, default=list)
+    seniority: Mapped[list] = mapped_column(JSON, default=list)
     # None => a single one-off run at start_at; otherwise the recurring cadence.
     interval_unit: Mapped[BatchIntervalUnit | None] = mapped_column(
         Enum(BatchIntervalUnit), nullable=True

@@ -16,14 +16,33 @@ class ScrapeError(RuntimeError):
     pass
 
 
-def build_search_state(query: str, days: int) -> dict[str, Any]:
-    return {
+def build_search_state(
+    query: str,
+    days: int,
+    departments: list[str] | None = None,
+    seniority: list[str] | None = None,
+    job_title_query: str = "",
+    technology_keywords_query: str = "",
+    job_description_query: str = "",
+) -> dict[str, Any]:
+    state: dict[str, Any] = {
         "searchQuery": query,
         "dateFetchedPastNDays": days,
         "sortBy": "date",
-        "departments": ["Engineering", "Software Development", "Information Technology"],
-        "seniorityLevel": ["Entry Level", "Mid Level", "No Prior Experience Required"],
+        "departments": departments
+        or ["Engineering", "Software Development", "Information Technology"],
+        "seniorityLevel": seniority or ["Entry Level", "Mid Level", "No Prior Experience Required"],
     }
+    # These three are separate boolean-query filters on HiringCafe (title-only, tech/tools
+    # mentioned in the posting, and full description respectively) — only send the ones the
+    # user actually filled in, since an empty string is a different thing from "not set".
+    if job_title_query.strip():
+        state["jobTitleQuery"] = job_title_query
+    if technology_keywords_query.strip():
+        state["technologyKeywordsQuery"] = technology_keywords_query
+    if job_description_query.strip():
+        state["jobDescriptionQuery"] = job_description_query
+    return state
 
 
 def _items(data):
@@ -58,17 +77,24 @@ def _ssr_items(html: str) -> list[dict]:
 def crawl(
     query: str,
     days: int,
-    departments=None,
-    seniority=None,
+    departments: list[str] | None = None,
+    seniority: list[str] | None = None,
+    job_title_query: str = "",
+    technology_keywords_query: str = "",
+    job_description_query: str = "",
     target: int = 100,
     headed: bool | None = None,
     progress: Callable[[int], None] | None = None,
 ) -> list[dict]:
-    state = build_search_state(query, days)
-    if departments is not None:
-        state["departments"] = departments
-    if seniority is not None:
-        state["seniorityLevel"] = seniority
+    state = build_search_state(
+        query,
+        days,
+        departments=departments,
+        seniority=seniority,
+        job_title_query=job_title_query,
+        technology_keywords_query=technology_keywords_query,
+        job_description_query=job_description_query,
+    )
     url = f"https://hiringcafe.com/?searchState={quote(json.dumps(state, separators=(',', ':')))}"
     collected: dict[str, dict] = {}
 

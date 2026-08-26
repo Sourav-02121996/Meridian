@@ -28,12 +28,29 @@ log = logging.getLogger("meridian.scheduler")
 scheduler = BackgroundScheduler(timezone=timezone.utc)
 
 _INTERVAL_KWARGS = {"hour": {"hours": 1}, "day": {"days": 1}, "week": {"weeks": 1}}
+_MISFIRE_GRACE_SECONDS = 300
+
+
+def _is_missed_one_time(batch: Batch) -> bool:
+    """A one-off batch whose start_at has already passed beyond the misfire grace
+    window will never fire — APScheduler just drops it silently. Detect that case so
+    we can mark it completed instead of leaving it stuck looking "active" forever."""
+    if batch.interval_unit is not None:
+        return False
+    start_at = (
+        batch.start_at if batch.start_at.tzinfo else batch.start_at.replace(tzinfo=timezone.utc)
+    )
+    return (datetime.now(timezone.utc) - start_at).total_seconds() > _MISFIRE_GRACE_SECONDS
 
 
 def start() -> None:
     with SessionLocal() as db:
         for batch in db.scalars(select(Batch).where(Batch.status == BatchStatus.active)).all():
-            _schedule(batch)
+            if _is_missed_one_time(batch):
+                batch.status = BatchStatus.completed
+            else:
+                _schedule(batch)
+        db.commit()
     scheduler.start()
 
 
@@ -65,7 +82,7 @@ def _schedule(batch: Batch) -> None:
         replace_existing=True,
         # If the backend was down (or busy) past the scheduled time, catch up within 5
         # minutes; beyond that, skip rather than surprise the user with a very late run.
-        misfire_grace_time=300,
+        misfire_grace_time=_MISFIRE_GRACE_SECONDS,
     )
 
 
@@ -97,6 +114,34 @@ def run_batch(batch_id: int) -> None:
         _run_batch(batch_id)
     except Exception:
         log.exception("Batch %s run bookkeeping failed", batch_id)
+
+
+def _build_profile(workspace: Workspace) -> dict:
+    """The full set of applicant-profile fields the Greenhouse adapter can attempt to
+    fill. Anything left blank on the workspace is simply omitted from the form fill —
+    never guessed or defaulted on the candidate's behalf."""
+    return {
+        "name": workspace.profile_name,
+        "email": workspace.profile_email,
+        "phone": workspace.profile_phone,
+        "linkedin": workspace.profile_linkedin,
+        "portfolio_url": workspace.profile_portfolio_url,
+        "github_url": workspace.profile_github_url,
+        "location": workspace.profile_location,
+        "current_company": workspace.profile_current_company,
+        "current_title": workspace.profile_current_title,
+        "desired_salary": workspace.profile_desired_salary,
+        "start_date": workspace.profile_start_date,
+        "work_authorized": workspace.profile_work_authorized,
+        "visa_sponsorship": workspace.profile_visa_sponsorship,
+        "willing_to_relocate": workspace.profile_willing_to_relocate,
+        "is_18_or_older": workspace.profile_18_or_older,
+        "gender": workspace.profile_gender,
+        "race_ethnicity": workspace.profile_race_ethnicity,
+        "veteran_status": workspace.profile_veteran_status,
+        "disability_status": workspace.profile_disability_status,
+        "cover_letter": workspace.cover_letter,
+    }
 
 
 def _decide_and_apply(
@@ -146,14 +191,18 @@ def _run_batch(batch_id: int) -> None:
                 counts = {"fetched": len(touched), "new": len(touched), "updated": 0}
             else:
                 touched, counts = discover_and_score(
-                    db, workspace, batch.query, batch.days, batch.max_jobs
+                    db,
+                    workspace,
+                    batch.query,
+                    batch.days,
+                    batch.max_jobs,
+                    departments=batch.departments or None,
+                    seniority=batch.seniority or None,
+                    job_title_query=batch.job_title_query,
+                    technology_keywords_query=batch.technology_keywords_query,
+                    job_description_query=batch.job_description_query,
                 )
-            profile = {
-                "name": workspace.profile_name,
-                "email": workspace.profile_email,
-                "phone": workspace.profile_phone,
-                "linkedin": workspace.profile_linkedin,
-            }
+            profile = _build_profile(workspace)
             auto_applied = needs_review = 0
             for job in touched:
                 if job.status != JobStatus.discovered:

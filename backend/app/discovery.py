@@ -16,13 +16,28 @@ def discover_and_score(
     query: str,
     days: int,
     max_jobs: int,
+    departments: list[str] | None = None,
+    seniority: list[str] | None = None,
+    job_title_query: str = "",
+    technology_keywords_query: str = "",
+    job_description_query: str = "",
     progress: Callable[[int], None] | None = None,
 ) -> tuple[list[Job], dict]:
     """Crawl HiringCafe for one workspace, score every result against its resume, and
     upsert jobs scoped to that workspace. Shared by the interactive Discover button and
     the unattended batch scheduler so both stay in sync.
     """
-    raw_jobs = crawl(query, days, target=max_jobs, progress=progress)
+    raw_jobs = crawl(
+        query,
+        days,
+        departments=departments,
+        seniority=seniority,
+        job_title_query=job_title_query,
+        technology_keywords_query=technology_keywords_query,
+        job_description_query=job_description_query,
+        target=max_jobs,
+        progress=progress,
+    )
     extracted_jobs: dict[str, dict] = {}
     for raw in raw_jobs:
         extracted = extract_job(raw)

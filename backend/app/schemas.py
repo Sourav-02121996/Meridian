@@ -40,6 +40,11 @@ class ScrapeRequest(BaseModel):
     query: str = "Software Engineer"
     days: int = Field(2, ge=1, le=30)
     max_jobs: int = Field(100, ge=1, le=1000)
+    job_title_query: str = ""
+    technology_keywords_query: str = ""
+    job_description_query: str = ""
+    departments: list[str] | None = None
+    seniority: list[str] | None = None
 
 
 class ResumeRequest(BaseModel):
@@ -59,6 +64,21 @@ class ProfileRequest(BaseModel):
     email: str = ""
     phone: str = ""
     linkedin: str = ""
+    portfolio_url: str = ""
+    github_url: str = ""
+    location: str = ""
+    current_company: str = ""
+    current_title: str = ""
+    desired_salary: str = ""
+    start_date: str = ""
+    work_authorized: str = ""
+    visa_sponsorship: str = ""
+    willing_to_relocate: str = ""
+    is_18_or_older: str = ""
+    gender: str = ""
+    race_ethnicity: str = ""
+    veteran_status: str = ""
+    disability_status: str = ""
     cover_letter: str = ""
 
 
@@ -94,6 +114,21 @@ class WorkspaceSettingsOut(BaseModel):
     profile_email: str
     profile_phone: str
     profile_linkedin: str
+    profile_portfolio_url: str
+    profile_github_url: str
+    profile_location: str
+    profile_current_company: str
+    profile_current_title: str
+    profile_desired_salary: str
+    profile_start_date: str
+    profile_work_authorized: str
+    profile_visa_sponsorship: str
+    profile_willing_to_relocate: str
+    profile_18_or_older: str
+    profile_gender: str
+    profile_race_ethnicity: str
+    profile_veteran_status: str
+    profile_disability_status: str
     cover_letter: str
 
 
@@ -102,6 +137,11 @@ class BatchCreate(BaseModel):
     query: str = "Software Engineer"
     days: int = Field(2, ge=1, le=30)
     max_jobs: int = Field(100, ge=1, le=1000)
+    job_title_query: str = ""
+    technology_keywords_query: str = ""
+    job_description_query: str = ""
+    departments: list[str] = Field(default_factory=list)
+    seniority: list[str] = Field(default_factory=list)
     # None => a single one-off run at start_at.
     interval_unit: BatchIntervalUnit | None = None
     start_at: datetime
@@ -121,6 +161,11 @@ class BatchOut(BaseModel):
     query: str
     days: int
     max_jobs: int
+    job_title_query: str = ""
+    technology_keywords_query: str = ""
+    job_description_query: str = ""
+    departments: list[str] = Field(default_factory=list)
+    seniority: list[str] = Field(default_factory=list)
     interval_unit: BatchIntervalUnit | None
     start_at: datetime
     repeat_mode: BatchRepeatMode

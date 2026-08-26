@@ -12,7 +12,18 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { api, Batch, BatchSource, Job, RepeatMode, Status, Workspace } from './api';
+import {
+  api,
+  Batch,
+  BatchSource,
+  DEPARTMENT_OPTIONS,
+  Job,
+  RepeatMode,
+  SENIORITY_OPTIONS,
+  Status,
+  Workspace,
+} from './api';
+import MultiSelectChips from './MultiSelectChips';
 
 const intervalLabels: Record<string, string> = {
   hour: 'Every hour',
@@ -43,13 +54,13 @@ export default function BatchesPage() {
 
   return (
     <main className="mx-auto w-full max-w-[1500px] flex-1 space-y-7 px-5 py-10 lg:px-10">
-      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-black/15 pb-7">
+      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-fg/15 pb-7">
         <div>
           <p className="eyebrow mb-3 w-fit">Automation</p>
           <h1 className="font-display text-4xl font-extrabold tracking-[-0.045em] sm:text-5xl">
             Batches.
           </h1>
-          <p className="mt-3 max-w-xl text-black/55">
+          <p className="mt-3 max-w-xl text-fg/65">
             Schedule unattended discovery for one workspace. Jobs at or above its auto-apply
             threshold get submitted automatically through supported ATS platforms; everything else
             lands in your review queue below.
@@ -60,7 +71,7 @@ export default function BatchesPage() {
         </button>
       </section>
       {batchesQ.isLoading ? (
-        <div className="p-12 text-center text-black/45">Loading batches…</div>
+        <div className="p-12 text-center text-fg/65">Loading batches…</div>
       ) : batchesQ.data?.length ? (
         <div className="space-y-4">
           {batchesQ.data.map((batch) => (
@@ -69,9 +80,9 @@ export default function BatchesPage() {
         </div>
       ) : (
         <div className="card p-16 text-center">
-          <PlayCircle className="mx-auto mb-3 text-black/25" size={40} />
+          <PlayCircle className="mx-auto mb-3 text-fg/65" size={40} />
           <p className="font-display font-bold">No batches yet</p>
-          <p className="mt-1 text-sm text-black/45">
+          <p className="mt-1 text-sm text-fg/65">
             Create one to auto-discover — and, above your threshold, auto-apply — on a schedule.
           </p>
         </div>
@@ -107,9 +118,9 @@ function BatchCard({ batch }: { batch: Batch }) {
     enabled: expanded,
   });
   const statusPill: Record<Batch['status'], string> = {
-    active: 'bg-sage/10 text-sage',
-    paused: 'bg-sun/20 text-amber-900',
-    completed: 'bg-neutral-100 text-neutral-600',
+    active: 'bg-accent/10 text-accent',
+    paused: 'bg-warning/20 text-warning',
+    completed: 'bg-fg/5 text-fg/65',
   };
 
   return (
@@ -123,11 +134,11 @@ function BatchCard({ batch }: { batch: Batch }) {
             >
               {batch.status}
             </span>
-            <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-bold text-black/50">
+            <span className="rounded-full bg-fg/5 px-2.5 py-0.5 text-xs font-bold text-fg/65">
               {batch.source === 'upload' ? 'Uploaded list' : 'Search'}
             </span>
           </div>
-          <p className="mt-1 text-sm text-black/55">
+          <p className="mt-1 text-sm text-fg/65">
             {batch.source === 'upload' ? (
               batch.query
             ) : (
@@ -137,13 +148,13 @@ function BatchCard({ batch }: { batch: Batch }) {
             )}{' '}
             · auto-apply ≥ {batch.auto_apply_threshold}
           </p>
-          <p className="mt-1 text-xs text-black/40">{scheduleSummary(batch)}</p>
+          <p className="mono-num mt-1 text-xs text-fg/65">{scheduleSummary(batch)}</p>
           {batch.status === 'active' && batch.next_run_at && (
-            <p className="text-xs text-black/40">
+            <p className="mono-num text-xs text-fg/65">
               Next run: {new Date(batch.next_run_at).toLocaleString()}
             </p>
           )}
-          <p className="text-xs text-black/40">
+          <p className="mono-num text-xs text-fg/65">
             Runs completed: {batch.runs_completed}
             {batch.run_limit ? ` / ${batch.run_limit}` : ''}
           </p>
@@ -174,7 +185,7 @@ function BatchCard({ batch }: { batch: Batch }) {
             <Zap size={14} /> Run now
           </button>
           <button
-            className="btn bg-neutral-100 text-neutral-600 hover:bg-red-50 hover:text-red-600"
+            className="btn bg-fg/5 text-fg/65 hover:bg-danger/10 hover:text-danger"
             onClick={() => deleteM.mutate()}
             disabled={deleteM.isPending}
             aria-label="Delete batch"
@@ -192,13 +203,13 @@ function BatchCard({ batch }: { batch: Batch }) {
         </div>
       </div>
       {runNowM.data && (
-        <p className="px-5 pb-3 text-sm text-sage">Run started — check back shortly.</p>
+        <p className="px-5 pb-3 text-sm text-accent">Run started — check back shortly.</p>
       )}
-      {runNowM.error && <p className="px-5 pb-3 text-sm text-red-600">{runNowM.error.message}</p>}
+      {runNowM.error && <p className="px-5 pb-3 text-sm text-danger">{runNowM.error.message}</p>}
       {expanded && (
-        <div className="space-y-6 border-t border-black/5 bg-white/70 p-5">
+        <div className="space-y-6 border-t border-fg/10 bg-fg/[.02] p-5">
           <div>
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-black/40">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-fg/65">
               Run history
             </h4>
             {runsQ.data?.length ? (
@@ -206,12 +217,12 @@ function BatchCard({ batch }: { batch: Batch }) {
                 {runsQ.data.map((run) => (
                   <div
                     key={run.id}
-                    className="flex flex-wrap items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2 text-sm"
+                    className="flex flex-wrap items-center gap-3 rounded-xl bg-fg/5 px-3 py-2 text-sm"
                   >
-                    <span className="font-semibold">
+                    <span className="mono-num font-semibold">
                       {new Date(run.started_at).toLocaleString()}
                     </span>
-                    <span className={run.status === 'failed' ? 'text-red-600' : 'text-black/60'}>
+                    <span className={run.status === 'failed' ? 'text-danger' : 'text-fg/65'}>
                       {run.status === 'failed'
                         ? `Failed: ${run.error}`
                         : `${run.fetched} fetched · ${run.auto_applied} auto-applied · ${run.needs_review} need review`}
@@ -220,11 +231,11 @@ function BatchCard({ batch }: { batch: Batch }) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-black/45">No runs yet.</p>
+              <p className="text-sm text-fg/65">No runs yet.</p>
             )}
           </div>
           <div>
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-black/40">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-fg/65">
               Needs your review
             </h4>
             {reviewQ.data?.length ? (
@@ -234,7 +245,7 @@ function BatchCard({ batch }: { batch: Batch }) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-black/45">Nothing waiting on you right now.</p>
+              <p className="text-sm text-fg/65">Nothing waiting on you right now.</p>
             )}
           </div>
         </div>
@@ -253,15 +264,15 @@ function ReviewRow({ job, workspaceId }: { job: Job; workspaceId: number }) {
     },
   });
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-black/10 px-3 py-2 text-sm">
-      <span className="rounded-lg bg-sun/20 px-2 py-1 font-display text-xs font-bold text-amber-900">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-fg/10 px-3 py-2 text-sm">
+      <span className="mono-num rounded-lg bg-warning/15 px-2 py-1 text-xs font-bold text-warning">
         {job.score}
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold">
-          {job.title} · <span className="font-normal text-black/50">{job.company}</span>
+          {job.title} · <span className="font-normal text-fg/65">{job.company}</span>
         </p>
-        <p className="text-xs text-black/40">
+        <p className="text-xs text-fg/65">
           {reviewReasonLabels[job.review_reason ?? ''] ?? job.review_reason}
         </p>
       </div>
@@ -271,14 +282,14 @@ function ReviewRow({ job, workspaceId }: { job: Job; workspaceId: number }) {
         </a>
       )}
       <button
-        className="btn bg-black text-white hover:bg-neutral-800"
+        className="btn bg-fg text-paper hover:brightness-110"
         disabled={patch.isPending}
         onClick={() => patch.mutate('applied')}
       >
         Apply
       </button>
       <button
-        className="btn bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+        className="btn bg-fg/5 text-fg/65 hover:bg-fg/10"
         disabled={patch.isPending}
         onClick={() => patch.mutate('skipped')}
       >
@@ -301,15 +312,22 @@ function CreateBatchDialog({
   const [query, setQuery] = useState('Software Engineer');
   const [days, setDays] = useState(2);
   const [maxJobs, setMaxJobs] = useState(100);
+  const [jobTitleQuery, setJobTitleQuery] = useState('');
+  const [technologyKeywordsQuery, setTechnologyKeywordsQuery] = useState('');
+  const [jobDescriptionQuery, setJobDescriptionQuery] = useState('');
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [seniority, setSeniority] = useState<string[]>([]);
   const [scheduleKind, setScheduleKind] = useState<'once' | 'recurring'>('once');
   const [intervalUnit, setIntervalUnit] = useState<'hour' | 'day' | 'week'>('day');
-  const [startAt, setStartAt] = useState(() =>
-    new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16),
-  );
+  const defaultStart = new Date(Date.now() + 5 * 60_000);
+  const [startDate, setStartDate] = useState(() => defaultStart.toISOString().slice(0, 10));
+  const [startTime, setStartTime] = useState(() => defaultStart.toISOString().slice(11, 16));
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('count');
   const [runLimit, setRunLimit] = useState(5);
   const [autoApplyThreshold, setAutoApplyThreshold] = useState(95);
   const [file, setFile] = useState<File | null>(null);
+  const toggle = (list: string[], setList: (v: string[]) => void, value: string) =>
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
   const createM = useMutation({
     mutationFn: () =>
@@ -317,7 +335,7 @@ function CreateBatchDialog({
         ? api.createUploadBatch({
             workspace_id: workspaceId,
             auto_apply_threshold: autoApplyThreshold,
-            start_at: new Date(startAt).toISOString(),
+            start_at: new Date(`${startDate}T${startTime}`).toISOString(),
             file: file!,
           })
         : api.createBatch({
@@ -325,8 +343,13 @@ function CreateBatchDialog({
             query,
             days,
             max_jobs: maxJobs,
+            job_title_query: jobTitleQuery,
+            technology_keywords_query: technologyKeywordsQuery,
+            job_description_query: jobDescriptionQuery,
+            departments,
+            seniority,
             interval_unit: scheduleKind === 'once' ? null : intervalUnit,
-            start_at: new Date(startAt).toISOString(),
+            start_at: new Date(`${startDate}T${startTime}`).toISOString(),
             repeat_mode: scheduleKind === 'once' ? 'count' : repeatMode,
             run_limit: scheduleKind === 'once' ? 1 : repeatMode === 'count' ? runLimit : null,
             auto_apply_threshold: autoApplyThreshold,
@@ -350,9 +373,9 @@ function CreateBatchDialog({
         className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm"
         onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       >
-        <div className="w-full max-w-md border-2 border-black bg-white p-7">
+        <div className="w-full max-w-md border-2 border-fg bg-surface p-7">
           <p className="font-display font-bold">Create a workspace first</p>
-          <p className="mt-2 text-sm text-black/55">
+          <p className="mt-2 text-sm text-fg/65">
             A batch automates one existing workspace — you'll need at least one before you can
             schedule anything.
           </p>
@@ -370,7 +393,7 @@ function CreateBatchDialog({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section
-        className="w-full max-w-lg border-2 border-black bg-white p-7"
+        className="w-full max-w-lg border-2 border-fg bg-surface p-7"
         role="dialog"
         aria-modal="true"
       >
@@ -400,14 +423,14 @@ function CreateBatchDialog({
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
-                className={source === 'search' ? 'btn bg-ink text-white' : 'btn btn-outline'}
+                className={source === 'search' ? 'btn bg-fg text-paper' : 'btn btn-outline'}
                 onClick={() => setSource('search')}
               >
                 Search HiringCafe
               </button>
               <button
                 type="button"
-                className={source === 'upload' ? 'btn bg-ink text-white' : 'btn btn-outline'}
+                className={source === 'upload' ? 'btn bg-fg text-paper' : 'btn btn-outline'}
                 onClick={() => {
                   setSource('upload');
                   setScheduleKind('once');
@@ -427,7 +450,7 @@ function CreateBatchDialog({
                 required
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
-              <span className="mt-1 block text-xs font-normal text-black/45">
+              <span className="mt-1 block text-xs font-normal text-fg/65">
                 Needs Title, Company, and Apply URL columns — the same layout "Download Excel"
                 produces. Score, if present, is reused as-is; rows already marked applied or skipped
                 are imported untouched.
@@ -444,7 +467,7 @@ function CreateBatchDialog({
                 />
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <label className="text-xs font-semibold text-black/50">
+                <label className="text-xs font-semibold text-fg/65">
                   Past days
                   <input
                     className="field mt-1 w-full"
@@ -455,7 +478,7 @@ function CreateBatchDialog({
                     onChange={(e) => setDays(+e.target.value)}
                   />
                 </label>
-                <label className="text-xs font-semibold text-black/50">
+                <label className="text-xs font-semibold text-fg/65">
                   Maximum jobs
                   <input
                     className="field mt-1 w-full"
@@ -467,14 +490,60 @@ function CreateBatchDialog({
                   />
                 </label>
               </div>
+              <details className="group">
+                <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-fg/40">
+                  More filters
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <label className="text-xs font-semibold text-fg/65">
+                    Job title (boolean query)
+                    <input
+                      className="field mt-1 w-full"
+                      placeholder='e.g. "Software Engineer" OR "Backend Engineer"'
+                      value={jobTitleQuery}
+                      onChange={(e) => setJobTitleQuery(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-fg/65">
+                    Technology keywords (boolean query)
+                    <input
+                      className="field mt-1 w-full"
+                      placeholder='e.g. "Python" AND "AWS"'
+                      value={technologyKeywordsQuery}
+                      onChange={(e) => setTechnologyKeywordsQuery(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-fg/65">
+                    Description keywords (boolean query)
+                    <input
+                      className="field mt-1 w-full"
+                      placeholder='e.g. "remote" OR "unlimited PTO"'
+                      value={jobDescriptionQuery}
+                      onChange={(e) => setJobDescriptionQuery(e.target.value)}
+                    />
+                  </label>
+                  <MultiSelectChips
+                    label="Departments"
+                    hint="Leave empty to use the default (Engineering, Software Development, IT)"
+                    options={DEPARTMENT_OPTIONS}
+                    selected={departments}
+                    onToggle={(v) => toggle(departments, setDepartments, v)}
+                  />
+                  <MultiSelectChips
+                    label="Seniority level"
+                    hint="Leave empty to use the default (Entry + Mid level)"
+                    options={SENIORITY_OPTIONS}
+                    selected={seniority}
+                    onToggle={(v) => toggle(seniority, setSeniority, v)}
+                  />
+                </div>
+              </details>
               <div>
                 <p className="text-sm font-bold">When</p>
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
-                    className={
-                      scheduleKind === 'once' ? 'btn bg-ink text-white' : 'btn btn-outline'
-                    }
+                    className={scheduleKind === 'once' ? 'btn bg-fg text-paper' : 'btn btn-outline'}
                     onClick={() => setScheduleKind('once')}
                   >
                     One-time
@@ -482,7 +551,7 @@ function CreateBatchDialog({
                   <button
                     type="button"
                     className={
-                      scheduleKind === 'recurring' ? 'btn bg-ink text-white' : 'btn btn-outline'
+                      scheduleKind === 'recurring' ? 'btn bg-fg text-paper' : 'btn btn-outline'
                     }
                     onClick={() => setScheduleKind('recurring')}
                   >
@@ -492,16 +561,25 @@ function CreateBatchDialog({
               </div>
             </>
           )}
-          <label className="block text-sm font-bold">
-            {scheduleKind === 'once' ? 'Run at' : 'Starting'}
-            <input
-              className="field mt-1 w-full"
-              type="datetime-local"
-              value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
-              required
-            />
-          </label>
+          <div>
+            <p className="text-sm font-bold">{scheduleKind === 'once' ? 'Run at' : 'Starting'}</p>
+            <div className="mt-1 grid grid-cols-2 gap-3">
+              <input
+                className="field w-full"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
+              <input
+                className="field w-full"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                required
+              />
+            </div>
+          </div>
           {source === 'search' && scheduleKind === 'recurring' && (
             <>
               <label className="block text-sm font-bold">
@@ -536,7 +614,7 @@ function CreateBatchDialog({
                     disabled={repeatMode !== 'count'}
                     onChange={(e) => setRunLimit(+e.target.value)}
                   />
-                  <span className="text-sm text-black/50">times</span>
+                  <span className="text-sm text-fg/65">times</span>
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="radio"
@@ -552,19 +630,19 @@ function CreateBatchDialog({
           <label className="block text-sm font-bold">
             Auto-apply threshold ({autoApplyThreshold})
             <input
-              className="mt-2 w-full accent-[#2563eb]"
+              className="mt-2 w-full accent-accent"
               type="range"
               min={0}
               max={100}
               value={autoApplyThreshold}
               onChange={(e) => setAutoApplyThreshold(+e.target.value)}
             />
-            <span className="mt-1 block text-xs font-normal text-black/45">
+            <span className="mt-1 block text-xs font-normal text-fg/65">
               Only jobs at or above this score get submitted automatically through Greenhouse;
               everything else lands in your review queue.
             </span>
           </label>
-          {createM.error && <p className="text-sm text-red-600">{createM.error.message}</p>}
+          {createM.error && <p className="text-sm text-danger">{createM.error.message}</p>}
           <button
             className="btn btn-dark w-full py-3"
             type="submit"
