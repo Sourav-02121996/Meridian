@@ -1,1 +1,1 @@
-"""Hirelight backend package."""
+"""Meridian backend package."""

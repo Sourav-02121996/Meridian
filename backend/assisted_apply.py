@@ -11,7 +11,7 @@ def main():
     with SessionLocal() as db:
         jobs = list(db.scalars(select(Job).where(Job.status == JobStatus.to_apply)).all())
     if not jobs:
-        print("Hirelight: no jobs marked To apply.")
+        print("Meridian: no jobs marked To apply.")
         return
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=False)

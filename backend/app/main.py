@@ -8,11 +8,11 @@ from .db import Base, engine
 from .routes import jobs, scrape, settings, stats
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s | Hirelight | %(levelname)s | %(message)s"
+    level=logging.INFO, format="%(asctime)s | Meridian | %(levelname)s | %(message)s"
 )
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Hirelight", version="1.0.0")
+app = FastAPI(title="Meridian", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[get_settings().frontend_origin],
@@ -28,4 +28,4 @@ app.include_router(settings.router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "Hirelight"}
+    return {"status": "ok", "app": "Meridian"}
