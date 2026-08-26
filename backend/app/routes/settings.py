@@ -4,45 +4,56 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..db import get_db
-from ..models import Setting
-from ..schemas import ResumeRequest, ThresholdRequest
+from ..models import Workspace
+from ..schemas import (
+    AutoApplyThresholdRequest,
+    ProfileRequest,
+    ResumeRequest,
+    ThresholdRequest,
+    WorkspaceSettingsOut,
+)
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
-
-
-def get_value(db: Session, key: str, default: str = "") -> str:
-    row = db.get(Setting, key)
-    return row.value if row else default
-
-
-def set_value(db: Session, key: str, value: str):
-    row = db.get(Setting, key)
-    if row:
-        row.value = value
-    else:
-        db.add(Setting(key=key, value=value))
-    db.commit()
+router = APIRouter(prefix="/api/workspaces/{workspace_id}/settings", tags=["settings"])
 
 
-@router.get("")
-def read_settings(db: Session = Depends(get_db)):
-    configured = get_settings()
-    return {
-        "resume": get_value(db, "resume"),
-        "threshold": float(get_value(db, "threshold", str(configured.score_threshold))),
-    }
+def _get_workspace(workspace_id: int, db: Session) -> Workspace:
+    workspace = db.get(Workspace, workspace_id)
+    if not workspace:
+        raise HTTPException(404, "Workspace not found")
+    return workspace
+
+
+@router.get("", response_model=WorkspaceSettingsOut)
+def read_settings(workspace_id: int, db: Session = Depends(get_db)):
+    workspace = _get_workspace(workspace_id, db)
+    return WorkspaceSettingsOut(
+        resume=workspace.resume_text,
+        resume_filename=workspace.resume_filename,
+        has_resume_file=bool(workspace.resume_file),
+        threshold=workspace.threshold,
+        auto_apply_threshold=workspace.auto_apply_threshold,
+        profile_name=workspace.profile_name,
+        profile_email=workspace.profile_email,
+        profile_phone=workspace.profile_phone,
+        profile_linkedin=workspace.profile_linkedin,
+        cover_letter=workspace.cover_letter,
+    )
 
 
 @router.post("/resume")
-def save_resume(payload: ResumeRequest, db: Session = Depends(get_db)):
-    set_value(db, "resume", payload.text)
+def save_resume(workspace_id: int, payload: ResumeRequest, db: Session = Depends(get_db)):
+    workspace = _get_workspace(workspace_id, db)
+    workspace.resume_text = payload.text
+    db.commit()
     return {"saved": True}
 
 
 @router.post("/resume/pdf")
-async def upload_resume_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_resume_pdf(
+    workspace_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)
+):
+    workspace = _get_workspace(workspace_id, db)
     filename = file.filename or "resume.pdf"
     if file.content_type not in {
         "application/pdf",
@@ -64,11 +75,40 @@ async def upload_resume_pdf(file: UploadFile = File(...), db: Session = Depends(
             422,
             "No selectable text was found. This may be a scanned PDF; export it with OCR and try again.",
         )
-    set_value(db, "resume", text)
+    # Keep the original file too (not just the extracted text) so batches can re-upload
+    # it as-is when auto-applying through a supported ATS.
+    workspace.resume_text = text
+    workspace.resume_filename = filename
+    workspace.resume_file = contents
+    db.commit()
     return {"saved": True, "text": text, "filename": filename, "pages": len(reader.pages)}
 
 
 @router.put("/threshold")
-def save_threshold(payload: ThresholdRequest, db: Session = Depends(get_db)):
-    set_value(db, "threshold", str(payload.value))
+def save_threshold(workspace_id: int, payload: ThresholdRequest, db: Session = Depends(get_db)):
+    workspace = _get_workspace(workspace_id, db)
+    workspace.threshold = payload.value
+    db.commit()
     return {"value": payload.value}
+
+
+@router.put("/auto-apply-threshold")
+def save_auto_apply_threshold(
+    workspace_id: int, payload: AutoApplyThresholdRequest, db: Session = Depends(get_db)
+):
+    workspace = _get_workspace(workspace_id, db)
+    workspace.auto_apply_threshold = payload.value
+    db.commit()
+    return {"value": payload.value}
+
+
+@router.put("/profile")
+def save_profile(workspace_id: int, payload: ProfileRequest, db: Session = Depends(get_db)):
+    workspace = _get_workspace(workspace_id, db)
+    workspace.profile_name = payload.name
+    workspace.profile_email = payload.email
+    workspace.profile_phone = payload.phone
+    workspace.profile_linkedin = payload.linkedin
+    workspace.cover_letter = payload.cover_letter
+    db.commit()
+    return {"saved": True}

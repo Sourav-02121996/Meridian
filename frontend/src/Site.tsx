@@ -1,17 +1,17 @@
 import { FormEvent, useState } from 'react';
 import {
   ArrowRight,
+  BarChart3,
   Check,
   Compass,
   FileText,
   House,
   Info,
-  LayoutDashboard,
-  LogOut,
+  LayoutGrid,
   Mail,
   Menu,
   MessageSquare,
-  Settings,
+  Plus,
   ShieldCheck,
   Sparkles,
   Target,
@@ -19,15 +19,26 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import Dashboard from './App';
+import WorkspaceGrid, { CreateWorkspaceDialog } from './WorkspaceGrid';
+import WorkspaceView from './WorkspaceView';
+import BatchesPage from './BatchesPage';
+import GlobalDashboard from './GlobalDashboard';
+import { Workspace } from './api';
 
-type View = 'home' | 'dashboard';
+type View = 'home' | 'workspaces' | 'workspace' | 'batches' | 'dashboard';
 
 export default function Site() {
   const [email, setEmail] = useState(() => localStorage.getItem('meridian-email') ?? '');
   const [view, setView] = useState<View>('home');
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
-  const openDashboard = () => (email ? setView('dashboard') : setLoginOpen(true));
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+
+  const openWorkspaces = () => (email ? setView('workspaces') : setLoginOpen(true));
+  const openWorkspace = (workspace: Workspace) => {
+    setActiveWorkspace(workspace);
+    setView('workspace');
+  };
   const goToSection = (id: string) => {
     setView('home');
     window.setTimeout(() => document.getElementById(id)?.scrollIntoView(), 0);
@@ -36,30 +47,48 @@ export default function Site() {
     localStorage.setItem('meridian-email', nextEmail);
     setEmail(nextEmail);
     setLoginOpen(false);
-    setView('dashboard');
+    setView('workspaces');
   };
   const logout = () => {
     localStorage.removeItem('meridian-email');
     setEmail('');
     setView('home');
   };
+
   return (
     <div className="flex min-h-screen flex-col bg-paper text-ink">
       <Header
         email={email}
-        onHome={() => setView('home')}
+        onHome={() => (email ? setView('workspaces') : setView('home'))}
         onSection={goToSection}
-        onDashboard={openDashboard}
+        onWorkspaces={openWorkspaces}
+        onCreateWorkspace={() => (email ? setCreateWorkspaceOpen(true) : setLoginOpen(true))}
+        onBatches={() => (email ? setView('batches') : setLoginOpen(true))}
+        onDashboard={() => (email ? setView('dashboard') : setLoginOpen(true))}
         onLogin={() => setLoginOpen(true)}
         onLogout={logout}
       />
-      {view === 'home' ? (
-        <Home onStart={openDashboard} onLogin={() => setLoginOpen(true)} />
-      ) : (
-        <Dashboard />
+      {view === 'home' && <Home onStart={openWorkspaces} onLogin={() => setLoginOpen(true)} />}
+      {view === 'workspaces' && <WorkspaceGrid onOpen={openWorkspace} />}
+      {view === 'workspace' && activeWorkspace && (
+        <WorkspaceView
+          workspaceId={activeWorkspace.id}
+          workspaceName={activeWorkspace.name}
+          onBack={() => setView('workspaces')}
+        />
       )}
+      {view === 'batches' && <BatchesPage />}
+      {view === 'dashboard' && <GlobalDashboard />}
       <Footer onAbout={() => goToSection('about')} />
       {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} onLogin={login} />}
+      {createWorkspaceOpen && (
+        <CreateWorkspaceDialog
+          onClose={() => {
+            setCreateWorkspaceOpen(false);
+            setView('workspaces');
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -81,6 +110,9 @@ function Header({
   email,
   onHome,
   onSection,
+  onWorkspaces,
+  onCreateWorkspace,
+  onBatches,
   onDashboard,
   onLogin,
   onLogout,
@@ -88,16 +120,15 @@ function Header({
   email: string;
   onHome: () => void;
   onSection: (id: string) => void;
+  onWorkspaces: () => void;
+  onCreateWorkspace: () => void;
+  onBatches: () => void;
   onDashboard: () => void;
   onLogin: () => void;
   onLogout: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const goToSection = (id: string) => {
-    setMenuOpen(false);
-    onSection(id);
-  };
   const choose = (action: () => void) => {
     setMenuOpen(false);
     setAccountOpen(false);
@@ -130,19 +161,39 @@ function Header({
           </button>
           {menuOpen && (
             <nav className="dropdown-panel left-0" aria-label="Navigation menu">
-              <button className="dropdown-item" onClick={() => choose(onHome)}>
-                <House size={17} /> Home
-              </button>
-              <button className="dropdown-item" onClick={() => goToSection('how-it-works')}>
-                <Compass size={17} /> How it works
-              </button>
-              <button className="dropdown-item" onClick={() => goToSection('about')}>
-                <Info size={17} /> About
-              </button>
-              {email && (
-                <button className="dropdown-item" onClick={() => choose(onDashboard)}>
-                  <LayoutDashboard size={17} /> Dashboard
-                </button>
+              {email ? (
+                <>
+                  <button className="dropdown-item" onClick={() => choose(onWorkspaces)}>
+                    <House size={17} /> Home
+                  </button>
+                  <button className="dropdown-item" onClick={() => choose(onCreateWorkspace)}>
+                    <Plus size={17} /> Create new workspace
+                  </button>
+                  <button className="dropdown-item" onClick={() => choose(onBatches)}>
+                    <Zap size={17} /> Create batch
+                  </button>
+                  <button className="dropdown-item" onClick={() => choose(onDashboard)}>
+                    <BarChart3 size={17} /> Dashboard
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="dropdown-item" onClick={() => choose(onHome)}>
+                    <House size={17} /> Home
+                  </button>
+                  <button
+                    className="dropdown-item"
+                    onClick={() => choose(() => onSection('how-it-works'))}
+                  >
+                    <Compass size={17} /> How it works
+                  </button>
+                  <button
+                    className="dropdown-item"
+                    onClick={() => choose(() => onSection('about'))}
+                  >
+                    <Info size={17} /> About
+                  </button>
+                </>
               )}
             </nav>
           )}
@@ -173,11 +224,8 @@ function Header({
                   <p className="mt-1 truncate text-sm font-bold">{email}</p>
                 </div>
                 <div className="p-2">
-                  <button className="dropdown-item" onClick={() => choose(onDashboard)}>
-                    <UserRound size={17} /> Account
-                  </button>
-                  <button className="dropdown-item" onClick={() => choose(onDashboard)}>
-                    <Settings size={17} /> Settings
+                  <button className="dropdown-item" onClick={() => choose(onWorkspaces)}>
+                    <LayoutGrid size={17} /> Workspaces
                   </button>
                   <a
                     className="dropdown-item"
@@ -192,7 +240,7 @@ function Header({
                     className="dropdown-item text-red-700 hover:bg-red-50"
                     onClick={() => choose(onLogout)}
                   >
-                    <LogOut size={17} /> Log out
+                    <UserRound size={17} /> Log out
                   </button>
                 </div>
               </div>

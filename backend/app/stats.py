@@ -5,11 +5,11 @@ from statistics import median
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Job, JobStatus
+from .models import Batch, BatchStatus, Job, JobStatus, Workspace
 
 
-def calculate_stats(db: Session, threshold: float) -> dict:
-    jobs = list(db.scalars(select(Job)).all())
+def calculate_stats(db: Session, workspace_id: int, threshold: float) -> dict:
+    jobs = list(db.scalars(select(Job).where(Job.workspace_id == workspace_id)).all())
     scores = [job.score for job in jobs]
     statuses = {status.value: 0 for status in JobStatus}
     statuses.update(Counter(job.status.value for job in jobs))
@@ -47,3 +47,42 @@ def _cumulative_applications(applied: Counter[date]) -> list[dict]:
         total += applied[day]
         points.append({"date": day.isoformat(), "count": total})
     return points
+
+
+def calculate_dashboard(db: Session) -> dict:
+    """Aggregate metrics across every workspace, for the global Dashboard page."""
+    workspaces = list(db.scalars(select(Workspace)).all())
+    jobs = list(db.scalars(select(Job)).all())
+    batches = list(db.scalars(select(Batch)).all())
+    jobs_by_workspace: dict[int, list[Job]] = defaultdict(list)
+    for job in jobs:
+        jobs_by_workspace[job.workspace_id].append(job)
+    by_workspace = [
+        {
+            "workspace_id": workspace.id,
+            "name": workspace.name,
+            "total_jobs": len(jobs_by_workspace[workspace.id]),
+            "applied": sum(
+                1 for job in jobs_by_workspace[workspace.id] if job.status == JobStatus.applied
+            ),
+            "applied_auto": sum(
+                1
+                for job in jobs_by_workspace[workspace.id]
+                if job.auto_apply_state == "applied_auto"
+            ),
+            "above_threshold": sum(
+                1 for job in jobs_by_workspace[workspace.id] if job.score >= workspace.threshold
+            ),
+        }
+        for workspace in workspaces
+    ]
+    return {
+        "workspace_count": len(workspaces),
+        "total_jobs": len(jobs),
+        "applied_total": sum(1 for job in jobs if job.status == JobStatus.applied),
+        "applied_auto_total": sum(1 for job in jobs if job.auto_apply_state == "applied_auto"),
+        "needs_review_total": sum(1 for job in jobs if job.auto_apply_state == "needs_review"),
+        "active_batches": sum(1 for batch in batches if batch.status == BatchStatus.active),
+        "total_batches": len(batches),
+        "by_workspace": by_workspace,
+    }

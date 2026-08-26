@@ -1,18 +1,29 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import scheduler
 from .config import get_settings
-from .db import Base, engine
-from .routes import jobs, scrape, settings, stats
+from .db import engine
+from .migrations import run_migrations
+from .routes import batches, dashboard, jobs, scrape, settings, stats, workspaces
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s | Meridian | %(levelname)s | %(message)s"
 )
-Base.metadata.create_all(bind=engine)
+run_migrations(engine)
 
-app = FastAPI(title="Meridian", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
+
+app = FastAPI(title="Meridian", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[get_settings().frontend_origin],
@@ -20,10 +31,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(workspaces.router)
+app.include_router(settings.router)
 app.include_router(jobs.router)
 app.include_router(scrape.router)
 app.include_router(stats.router)
-app.include_router(settings.router)
+app.include_router(dashboard.router)
+app.include_router(batches.router)
 
 
 @app.get("/api/health")

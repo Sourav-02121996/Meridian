@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  ArrowLeft,
   BarChart3,
   BriefcaseBusiness,
   ChevronDown,
@@ -12,6 +13,7 @@ import {
   Sparkles,
   Target,
   Upload,
+  UserRound,
   Users,
 } from 'lucide-react';
 import {
@@ -37,6 +39,13 @@ const statusLabels: Record<Status, string> = {
   applied: 'Applied',
   skipped: 'Skipped',
 };
+const reviewReasonLabels: Record<string, string> = {
+  below_threshold: 'Below auto-apply threshold',
+  unsupported_ats: 'ATS not supported for auto-apply',
+  no_resume_file: 'No resume PDF on file',
+  custom_questions: 'Form has custom questions',
+  form_error: "Couldn't confirm submission",
+};
 const colors = ['#2563eb', '#d89b24', '#168f83', '#df6c55'];
 
 function scoreTone(score: number, threshold: number) {
@@ -47,12 +56,24 @@ function scoreTone(score: number, threshold: number) {
       : 'bg-neutral-100 text-neutral-600';
 }
 
-function Dashboard() {
+function WorkspaceView({
+  workspaceId,
+  workspaceName,
+  onBack,
+}: {
+  workspaceId: number;
+  workspaceName: string;
+  onBack: () => void;
+}) {
   const qc = useQueryClient(),
-    settingsQ = useQuery({ queryKey: ['settings'], queryFn: api.settings }),
-    statsQ = useQuery({ queryKey: ['stats'], queryFn: api.stats });
+    settingsQ = useQuery({
+      queryKey: ['settings', workspaceId],
+      queryFn: () => api.settings(workspaceId),
+    }),
+    statsQ = useQuery({ queryKey: ['stats', workspaceId], queryFn: () => api.stats(workspaceId) });
   const [resume, setResume] = useState(''),
     [threshold, setThreshold] = useState(82),
+    [autoApplyThreshold, setAutoApplyThreshold] = useState(95),
     [status, setStatus] = useState(''),
     [minScore, setMinScore] = useState(''),
     [search, setSearch] = useState(''),
@@ -62,6 +83,7 @@ function Dashboard() {
     if (settingsQ.data) {
       setResume(settingsQ.data.resume);
       setThreshold(settingsQ.data.threshold);
+      setAutoApplyThreshold(settingsQ.data.auto_apply_threshold);
     }
   }, [settingsQ.data]);
   const params = new URLSearchParams();
@@ -71,64 +93,70 @@ function Dashboard() {
   params.set('sort', sort);
   params.set('order', order);
   const jobsQ = useQuery({
-    queryKey: ['jobs', params.toString()],
-    queryFn: () => api.jobs(params),
+    queryKey: ['jobs', workspaceId, params.toString()],
+    queryFn: () => api.jobs(workspaceId, params),
   });
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ['jobs'] });
-    qc.invalidateQueries({ queryKey: ['stats'] });
+    qc.invalidateQueries({ queryKey: ['jobs', workspaceId] });
+    qc.invalidateQueries({ queryKey: ['stats', workspaceId] });
   };
   const resumeM = useMutation({
-    mutationFn: api.saveResume,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    mutationFn: (text: string) => api.saveResume(workspaceId, text),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings', workspaceId] }),
   });
   const thresholdM = useMutation({
-    mutationFn: api.saveThreshold,
+    mutationFn: (value: number) => api.saveThreshold(workspaceId, value),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['settings'] });
-      qc.invalidateQueries({ queryKey: ['stats'] });
+      qc.invalidateQueries({ queryKey: ['settings', workspaceId] });
+      qc.invalidateQueries({ queryKey: ['stats', workspaceId] });
     },
+  });
+  const autoApplyThresholdM = useMutation({
+    mutationFn: (value: number) => api.saveAutoApplyThreshold(workspaceId, value),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings', workspaceId] }),
   });
   return (
     <main className="mx-auto w-full max-w-[1500px] flex-1 space-y-7 px-5 py-10 lg:px-10">
       <section className="border-b border-black/15 pb-7">
-        <p className="eyebrow mb-3 w-fit">Your workspace</p>
+        <button
+          className="mb-4 flex items-center gap-2 text-sm font-semibold text-black/50 hover:text-black"
+          onClick={onBack}
+        >
+          <ArrowLeft size={16} /> All workspaces
+        </button>
+        <p className="eyebrow mb-3 w-fit">{workspaceName}</p>
         <h1 className="font-display text-4xl font-extrabold tracking-[-0.045em] sm:text-5xl">
           Make your next move.
         </h1>
       </section>
       <section className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
         <ResumePanel
+          workspaceId={workspaceId}
           value={resume}
           setValue={setResume}
           saving={resumeM.isPending}
           onSave={() => resumeM.mutate(resume)}
         />
-        <Discover onDone={refresh} />
+        <Discover workspaceId={workspaceId} onDone={refresh} />
       </section>
-      <div className="card flex flex-wrap items-center gap-5 px-5 py-4">
-        <Target className="text-sage" />
-        <div>
-          <p className="font-semibold">Your match threshold</p>
-          <p className="text-xs text-black/45">Jobs at or above this score are highlighted</p>
-        </div>
-        <input
-          className="min-w-48 flex-1 accent-[#2563eb]"
-          aria-label="Match threshold"
-          type="range"
-          min="0"
-          max="100"
+      <ProfilePanel workspaceId={workspaceId} settings={settingsQ.data} />
+      <div className="grid gap-5 md:grid-cols-2">
+        <ThresholdCard
+          icon={<Target className="text-sage" />}
+          title="Your match threshold"
+          hint="Jobs at or above this score are highlighted"
           value={threshold}
-          onChange={(e) => setThreshold(+e.target.value)}
-          onPointerUp={(e) => thresholdM.mutate(+(e.currentTarget as HTMLInputElement).value)}
-          onKeyUp={(e) => {
-            if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key))
-              thresholdM.mutate(+(e.currentTarget as HTMLInputElement).value);
-          }}
+          setValue={setThreshold}
+          onCommit={(value) => thresholdM.mutate(value)}
         />
-        <span className="rounded-xl bg-sage px-3 py-1.5 font-display font-bold text-white">
-          {threshold}
-        </span>
+        <ThresholdCard
+          icon={<Sparkles className="text-sage" />}
+          title="Auto-apply threshold"
+          hint="Batches only submit automatically at or above this score"
+          value={autoApplyThreshold}
+          setValue={setAutoApplyThreshold}
+          onCommit={(value) => autoApplyThresholdM.mutate(value)}
+        />
       </div>
       <StatCards stats={statsQ.data} />
       <Charts stats={statsQ.data} />
@@ -143,7 +171,7 @@ function Dashboard() {
               <span className="text-sm font-medium text-black/45">
                 {jobsQ.data?.length ?? 0} jobs
               </span>
-              <ExportButton params={params} />
+              <ExportButton workspaceId={workspaceId} params={params} />
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -197,7 +225,12 @@ function Dashboard() {
         ) : jobsQ.isError ? (
           <ErrorBox error={jobsQ.error} />
         ) : jobsQ.data?.length ? (
-          <JobTable jobs={jobsQ.data} threshold={threshold} onChanged={refresh} />
+          <JobTable
+            jobs={jobsQ.data}
+            threshold={threshold}
+            workspaceId={workspaceId}
+            onChanged={refresh}
+          />
         ) : (
           <div className="p-16 text-center">
             <BriefcaseBusiness className="mx-auto mb-3 text-black/25" size={40} />
@@ -212,12 +245,57 @@ function Dashboard() {
   );
 }
 
+function ThresholdCard({
+  icon,
+  title,
+  hint,
+  value,
+  setValue,
+  onCommit,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  value: number;
+  setValue: (v: number) => void;
+  onCommit: (v: number) => void;
+}) {
+  return (
+    <div className="card flex flex-wrap items-center gap-5 px-5 py-4">
+      {icon}
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p className="text-xs text-black/45">{hint}</p>
+      </div>
+      <input
+        className="min-w-48 flex-1 accent-[#2563eb]"
+        aria-label={title}
+        type="range"
+        min="0"
+        max="100"
+        value={value}
+        onChange={(e) => setValue(+e.target.value)}
+        onPointerUp={(e) => onCommit(+(e.currentTarget as HTMLInputElement).value)}
+        onKeyUp={(e) => {
+          if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key))
+            onCommit(+(e.currentTarget as HTMLInputElement).value);
+        }}
+      />
+      <span className="rounded-xl bg-sage px-3 py-1.5 font-display font-bold text-white">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function ResumePanel({
+  workspaceId,
   value,
   setValue,
   saving,
   onSave,
 }: {
+  workspaceId: number;
   value: string;
   setValue: (v: string) => void;
   saving: boolean;
@@ -225,7 +303,7 @@ function ResumePanel({
 }) {
   const [uploadMessage, setUploadMessage] = useState('');
   const uploadM = useMutation({
-    mutationFn: api.uploadResumePdf,
+    mutationFn: (file: File) => api.uploadResumePdf(workspaceId, file),
     onSuccess: (data) => {
       setValue(data.text);
       setUploadMessage(
@@ -248,7 +326,8 @@ function ResumePanel({
         <div>
           <h2 className="font-display font-bold">Your resume</h2>
           <p className="text-sm text-black/45">
-            Paste text or upload a text-based PDF. Your resume stays on this machine.
+            Paste text or upload a text-based PDF. Uploading a PDF also keeps the original file on
+            hand so batches can attach it when auto-applying.
           </p>
         </div>
       </div>
@@ -287,15 +366,110 @@ function ResumePanel({
   );
 }
 
-function Discover({ onDone }: { onDone: () => void }) {
+function ProfilePanel({
+  workspaceId,
+  settings,
+}: {
+  workspaceId: number;
+  settings?: {
+    profile_name: string;
+    profile_email: string;
+    profile_phone: string;
+    profile_linkedin: string;
+    cover_letter: string;
+  };
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(''),
+    [email, setEmail] = useState(''),
+    [phone, setPhone] = useState(''),
+    [linkedin, setLinkedin] = useState(''),
+    [coverLetter, setCoverLetter] = useState('');
+  useEffect(() => {
+    if (settings) {
+      setName(settings.profile_name);
+      setEmail(settings.profile_email);
+      setPhone(settings.profile_phone);
+      setLinkedin(settings.profile_linkedin);
+      setCoverLetter(settings.cover_letter);
+    }
+  }, [settings]);
+  const saveM = useMutation({
+    mutationFn: () =>
+      api.saveProfile(workspaceId, { name, email, phone, linkedin, cover_letter: coverLetter }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings', workspaceId] }),
+  });
+  return (
+    <section className="card p-6">
+      <div className="mb-4 flex items-start gap-3">
+        <div className="rounded-xl bg-sage/10 p-2 text-sage">
+          <UserRound size={20} />
+        </div>
+        <div>
+          <h2 className="font-display font-bold">Applicant profile</h2>
+          <p className="text-sm text-black/45">
+            Used to fill standard fields when a batch auto-applies on your behalf.
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <input
+          className="field"
+          placeholder="Full name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          className="field"
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="Phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="LinkedIn URL"
+          value={linkedin}
+          onChange={(e) => setLinkedin(e.target.value)}
+        />
+      </div>
+      <textarea
+        className="field mt-3 h-20 w-full resize-none"
+        placeholder="Optional cover letter template"
+        value={coverLetter}
+        onChange={(e) => setCoverLetter(e.target.value)}
+      />
+      <div className="mt-3 flex justify-end">
+        <button
+          className="btn bg-ink text-white hover:bg-sage"
+          onClick={() => saveM.mutate()}
+          disabled={saveM.isPending}
+        >
+          {saveM.isPending ? 'Saving…' : 'Save profile'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => void }) {
   const [query, setQuery] = useState('Software Engineer'),
     [days, setDays] = useState(2),
     [max, setMax] = useState(100),
     [polling, setPolling] = useState(false);
-  const mutation = useMutation({ mutationFn: api.scrape, onSuccess: () => setPolling(true) });
+  const mutation = useMutation({
+    mutationFn: () => api.scrape(workspaceId, { query, days, max_jobs: max }),
+    onSuccess: () => setPolling(true),
+  });
   const statusQ = useQuery({
-    queryKey: ['scrape-status'],
-    queryFn: api.scrapeStatus,
+    queryKey: ['scrape-status', workspaceId],
+    queryFn: () => api.scrapeStatus(workspaceId),
     enabled: polling,
     refetchInterval: polling ? 1000 : false,
   });
@@ -307,7 +481,7 @@ function Discover({ onDone }: { onDone: () => void }) {
   }, [polling, statusQ.data?.done, statusQ.data?.error, onDone]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    mutation.mutate({ query, days, max_jobs: max });
+    mutation.mutate();
   };
   const busy = mutation.isPending || polling;
   const result = statusQ.data?.result;
@@ -381,9 +555,9 @@ function Discover({ onDone }: { onDone: () => void }) {
   );
 }
 
-function ExportButton({ params }: { params: URLSearchParams }) {
+function ExportButton({ workspaceId, params }: { workspaceId: number; params: URLSearchParams }) {
   const mutation = useMutation({
-    mutationFn: () => api.exportJobs(params),
+    mutationFn: () => api.exportJobs(workspaceId, params),
     onSuccess: (blob) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -517,10 +691,12 @@ function Chart({ title, children }: { title: string; children: any }) {
 function JobTable({
   jobs,
   threshold,
+  workspaceId,
   onChanged,
 }: {
   jobs: Job[];
   threshold: number;
+  workspaceId: number;
   onChanged: () => void;
 }) {
   return (
@@ -535,7 +711,13 @@ function JobTable({
       </div>
       <div className="divide-y divide-black/5">
         {jobs.map((job) => (
-          <JobRow job={job} threshold={threshold} key={job.id} onChanged={onChanged} />
+          <JobRow
+            job={job}
+            threshold={threshold}
+            workspaceId={workspaceId}
+            key={job.id}
+            onChanged={onChanged}
+          />
         ))}
       </div>
     </div>
@@ -544,20 +726,22 @@ function JobTable({
 function JobRow({
   job,
   threshold,
+  workspaceId,
   onChanged,
 }: {
   job: Job;
   threshold: number;
+  workspaceId: number;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const patch = useMutation({
-    mutationFn: (status: Status) => api.patchJob(job.id, status),
+    mutationFn: (status: Status) => api.patchJob(workspaceId, job.id, status),
     onMutate: async (status) => {
-      await qc.cancelQueries({ queryKey: ['jobs'] });
-      const snapshots = qc.getQueriesData<Job[]>({ queryKey: ['jobs'] });
-      qc.setQueriesData<Job[]>({ queryKey: ['jobs'] }, (old) =>
+      await qc.cancelQueries({ queryKey: ['jobs', workspaceId] });
+      const snapshots = qc.getQueriesData<Job[]>({ queryKey: ['jobs', workspaceId] });
+      qc.setQueriesData<Job[]>({ queryKey: ['jobs', workspaceId] }, (old) =>
         old?.map((j) => (j.id === job.id ? { ...j, status } : j)),
       );
       return { snapshots };
@@ -579,6 +763,16 @@ function JobRow({
           <p className="mt-0.5 text-xs text-black/40">
             Fetched {new Date(job.date_fetched).toLocaleDateString()}
           </p>
+          {job.auto_apply_state === 'applied_auto' && (
+            <span className="mt-1 inline-block rounded-full bg-teal/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-teal">
+              Auto-applied
+            </span>
+          )}
+          {job.auto_apply_state === 'needs_review' && (
+            <span className="mt-1 inline-block rounded-full bg-sun/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-900">
+              Needs review · {reviewReasonLabels[job.review_reason ?? ''] ?? job.review_reason}
+            </span>
+          )}
         </div>
         <p className="text-sm font-medium text-black/65">{job.company}</p>
         <span className="w-fit rounded-full bg-neutral-100 px-2.5 py-1 text-xs capitalize text-neutral-600">
@@ -696,4 +890,4 @@ function JobRow({
 function ErrorBox({ error }: { error: Error }) {
   return <div className="m-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error.message}</div>;
 }
-export default Dashboard;
+export default WorkspaceView;

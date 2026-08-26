@@ -1,16 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..db import get_db
-from ..models import Setting
+from ..models import Workspace
 from ..stats import calculate_stats
 
-router = APIRouter(prefix="/api/stats", tags=["stats"])
+router = APIRouter(prefix="/api/workspaces/{workspace_id}/stats", tags=["stats"])
 
 
 @router.get("")
-def get_stats(db: Session = Depends(get_db)):
-    saved = db.get(Setting, "threshold")
-    threshold = float(saved.value) if saved else get_settings().score_threshold
-    return calculate_stats(db, threshold)
+def get_stats(workspace_id: int, db: Session = Depends(get_db)):
+    workspace = db.get(Workspace, workspace_id)
+    if not workspace:
+        raise HTTPException(404, "Workspace not found")
+    return calculate_stats(db, workspace_id, workspace.threshold)
