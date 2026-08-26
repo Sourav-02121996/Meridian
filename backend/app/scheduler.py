@@ -116,6 +116,34 @@ def run_batch(batch_id: int) -> None:
         log.exception("Batch %s run bookkeeping failed", batch_id)
 
 
+def _build_profile(workspace: Workspace) -> dict:
+    """The full set of applicant-profile fields the Greenhouse adapter can attempt to
+    fill. Anything left blank on the workspace is simply omitted from the form fill —
+    never guessed or defaulted on the candidate's behalf."""
+    return {
+        "name": workspace.profile_name,
+        "email": workspace.profile_email,
+        "phone": workspace.profile_phone,
+        "linkedin": workspace.profile_linkedin,
+        "portfolio_url": workspace.profile_portfolio_url,
+        "github_url": workspace.profile_github_url,
+        "location": workspace.profile_location,
+        "current_company": workspace.profile_current_company,
+        "current_title": workspace.profile_current_title,
+        "desired_salary": workspace.profile_desired_salary,
+        "start_date": workspace.profile_start_date,
+        "work_authorized": workspace.profile_work_authorized,
+        "visa_sponsorship": workspace.profile_visa_sponsorship,
+        "willing_to_relocate": workspace.profile_willing_to_relocate,
+        "is_18_or_older": workspace.profile_18_or_older,
+        "gender": workspace.profile_gender,
+        "race_ethnicity": workspace.profile_race_ethnicity,
+        "veteran_status": workspace.profile_veteran_status,
+        "disability_status": workspace.profile_disability_status,
+        "cover_letter": workspace.cover_letter,
+    }
+
+
 def _decide_and_apply(
     job: Job, workspace: Workspace, auto_apply_threshold: float, profile: dict, run_id: int
 ) -> bool:
@@ -163,14 +191,18 @@ def _run_batch(batch_id: int) -> None:
                 counts = {"fetched": len(touched), "new": len(touched), "updated": 0}
             else:
                 touched, counts = discover_and_score(
-                    db, workspace, batch.query, batch.days, batch.max_jobs
+                    db,
+                    workspace,
+                    batch.query,
+                    batch.days,
+                    batch.max_jobs,
+                    departments=batch.departments or None,
+                    seniority=batch.seniority or None,
+                    job_title_query=batch.job_title_query,
+                    technology_keywords_query=batch.technology_keywords_query,
+                    job_description_query=batch.job_description_query,
                 )
-            profile = {
-                "name": workspace.profile_name,
-                "email": workspace.profile_email,
-                "phone": workspace.profile_phone,
-                "linkedin": workspace.profile_linkedin,
-            }
+            profile = _build_profile(workspace)
             auto_applied = needs_review = 0
             for job in touched:
                 if job.status != JobStatus.discovered:

@@ -12,7 +12,18 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { api, Batch, BatchSource, Job, RepeatMode, Status, Workspace } from './api';
+import {
+  api,
+  Batch,
+  BatchSource,
+  DEPARTMENT_OPTIONS,
+  Job,
+  RepeatMode,
+  SENIORITY_OPTIONS,
+  Status,
+  Workspace,
+} from './api';
+import MultiSelectChips from './MultiSelectChips';
 
 const intervalLabels: Record<string, string> = {
   hour: 'Every hour',
@@ -301,15 +312,22 @@ function CreateBatchDialog({
   const [query, setQuery] = useState('Software Engineer');
   const [days, setDays] = useState(2);
   const [maxJobs, setMaxJobs] = useState(100);
+  const [jobTitleQuery, setJobTitleQuery] = useState('');
+  const [technologyKeywordsQuery, setTechnologyKeywordsQuery] = useState('');
+  const [jobDescriptionQuery, setJobDescriptionQuery] = useState('');
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [seniority, setSeniority] = useState<string[]>([]);
   const [scheduleKind, setScheduleKind] = useState<'once' | 'recurring'>('once');
   const [intervalUnit, setIntervalUnit] = useState<'hour' | 'day' | 'week'>('day');
-  const [startAt, setStartAt] = useState(() =>
-    new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16),
-  );
+  const defaultStart = new Date(Date.now() + 5 * 60_000);
+  const [startDate, setStartDate] = useState(() => defaultStart.toISOString().slice(0, 10));
+  const [startTime, setStartTime] = useState(() => defaultStart.toISOString().slice(11, 16));
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('count');
   const [runLimit, setRunLimit] = useState(5);
   const [autoApplyThreshold, setAutoApplyThreshold] = useState(95);
   const [file, setFile] = useState<File | null>(null);
+  const toggle = (list: string[], setList: (v: string[]) => void, value: string) =>
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
   const createM = useMutation({
     mutationFn: () =>
@@ -317,7 +335,7 @@ function CreateBatchDialog({
         ? api.createUploadBatch({
             workspace_id: workspaceId,
             auto_apply_threshold: autoApplyThreshold,
-            start_at: new Date(startAt).toISOString(),
+            start_at: new Date(`${startDate}T${startTime}`).toISOString(),
             file: file!,
           })
         : api.createBatch({
@@ -325,8 +343,13 @@ function CreateBatchDialog({
             query,
             days,
             max_jobs: maxJobs,
+            job_title_query: jobTitleQuery,
+            technology_keywords_query: technologyKeywordsQuery,
+            job_description_query: jobDescriptionQuery,
+            departments,
+            seniority,
             interval_unit: scheduleKind === 'once' ? null : intervalUnit,
-            start_at: new Date(startAt).toISOString(),
+            start_at: new Date(`${startDate}T${startTime}`).toISOString(),
             repeat_mode: scheduleKind === 'once' ? 'count' : repeatMode,
             run_limit: scheduleKind === 'once' ? 1 : repeatMode === 'count' ? runLimit : null,
             auto_apply_threshold: autoApplyThreshold,
@@ -467,6 +490,54 @@ function CreateBatchDialog({
                   />
                 </label>
               </div>
+              <details className="group">
+                <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-fg/40">
+                  More filters
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <label className="text-xs font-semibold text-fg/65">
+                    Job title (boolean query)
+                    <input
+                      className="field mt-1 w-full"
+                      placeholder='e.g. "Software Engineer" OR "Backend Engineer"'
+                      value={jobTitleQuery}
+                      onChange={(e) => setJobTitleQuery(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-fg/65">
+                    Technology keywords (boolean query)
+                    <input
+                      className="field mt-1 w-full"
+                      placeholder='e.g. "Python" AND "AWS"'
+                      value={technologyKeywordsQuery}
+                      onChange={(e) => setTechnologyKeywordsQuery(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-fg/65">
+                    Description keywords (boolean query)
+                    <input
+                      className="field mt-1 w-full"
+                      placeholder='e.g. "remote" OR "unlimited PTO"'
+                      value={jobDescriptionQuery}
+                      onChange={(e) => setJobDescriptionQuery(e.target.value)}
+                    />
+                  </label>
+                  <MultiSelectChips
+                    label="Departments"
+                    hint="Leave empty to use the default (Engineering, Software Development, IT)"
+                    options={DEPARTMENT_OPTIONS}
+                    selected={departments}
+                    onToggle={(v) => toggle(departments, setDepartments, v)}
+                  />
+                  <MultiSelectChips
+                    label="Seniority level"
+                    hint="Leave empty to use the default (Entry + Mid level)"
+                    options={SENIORITY_OPTIONS}
+                    selected={seniority}
+                    onToggle={(v) => toggle(seniority, setSeniority, v)}
+                  />
+                </div>
+              </details>
               <div>
                 <p className="text-sm font-bold">When</p>
                 <div className="mt-2 flex gap-2">
@@ -490,16 +561,25 @@ function CreateBatchDialog({
               </div>
             </>
           )}
-          <label className="block text-sm font-bold">
-            {scheduleKind === 'once' ? 'Run at' : 'Starting'}
-            <input
-              className="field mt-1 w-full"
-              type="datetime-local"
-              value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
-              required
-            />
-          </label>
+          <div>
+            <p className="text-sm font-bold">{scheduleKind === 'once' ? 'Run at' : 'Starting'}</p>
+            <div className="mt-1 grid grid-cols-2 gap-3">
+              <input
+                className="field w-full"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
+              <input
+                className="field w-full"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                required
+              />
+            </div>
+          </div>
           {source === 'search' && scheduleKind === 'recurring' && (
             <>
               <label className="block text-sm font-bold">

@@ -46,6 +46,21 @@ export interface WorkspaceSettings {
   profile_email: string;
   profile_phone: string;
   profile_linkedin: string;
+  profile_portfolio_url: string;
+  profile_github_url: string;
+  profile_location: string;
+  profile_current_company: string;
+  profile_current_title: string;
+  profile_desired_salary: string;
+  profile_start_date: string;
+  profile_work_authorized: string;
+  profile_visa_sponsorship: string;
+  profile_willing_to_relocate: string;
+  profile_18_or_older: string;
+  profile_gender: string;
+  profile_race_ethnicity: string;
+  profile_veteran_status: string;
+  profile_disability_status: string;
   cover_letter: string;
 }
 
@@ -54,7 +69,53 @@ export interface Profile {
   email: string;
   phone: string;
   linkedin: string;
+  portfolio_url: string;
+  github_url: string;
+  location: string;
+  current_company: string;
+  current_title: string;
+  desired_salary: string;
+  start_date: string;
+  work_authorized: string;
+  visa_sponsorship: string;
+  willing_to_relocate: string;
+  is_18_or_older: string;
+  gender: string;
+  race_ethnicity: string;
+  veteran_status: string;
+  disability_status: string;
   cover_letter: string;
+}
+
+// Verified directly against HiringCafe's own filter panels (not guessed) — these are
+// the literal strings its search expects for `departments` / `seniorityLevel`.
+export const DEPARTMENT_OPTIONS = [
+  'Engineering',
+  'Software Development',
+  'Information Technology',
+  'Data and Analytics',
+  'Design',
+  'Creative and Art Services',
+  'Project and Program Management',
+  'Product Management',
+  'Business Operations',
+  'Legal and Compliance',
+  'Finance and Accounting',
+  'Human Resources',
+];
+export const SENIORITY_OPTIONS = [
+  'No Prior Experience Required',
+  'Entry Level',
+  'Mid Level',
+  'Senior Level',
+];
+
+export interface DiscoveryFilters {
+  job_title_query: string;
+  technology_keywords_query: string;
+  job_description_query: string;
+  departments: string[];
+  seniority: string[];
 }
 
 export interface Stats {
@@ -81,7 +142,7 @@ export type RepeatMode = 'count' | 'indefinite';
 export type BatchStatus = 'active' | 'paused' | 'completed';
 export type BatchSource = 'search' | 'upload';
 
-export interface Batch {
+export interface Batch extends DiscoveryFilters {
   id: number;
   workspace_id: number;
   workspace_name: string;
@@ -204,7 +265,10 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
-  scrape: (workspaceId: number, payload: { query: string; days: number; max_jobs: number }) =>
+  scrape: (
+    workspaceId: number,
+    payload: { query: string; days: number; max_jobs: number } & Partial<DiscoveryFilters>,
+  ) =>
     request<{ started: boolean }>(`/api/workspaces/${workspaceId}/scrape`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -220,17 +284,19 @@ export const api = {
   dashboard: () => request<DashboardStats>('/api/dashboard'),
 
   batches: () => request<Batch[]>('/api/batches'),
-  createBatch: (payload: {
-    workspace_id: number;
-    query: string;
-    days: number;
-    max_jobs: number;
-    interval_unit: IntervalUnit;
-    start_at: string;
-    repeat_mode: RepeatMode;
-    run_limit: number | null;
-    auto_apply_threshold: number;
-  }) => request<Batch>('/api/batches', { method: 'POST', body: JSON.stringify(payload) }),
+  createBatch: (
+    payload: {
+      workspace_id: number;
+      query: string;
+      days: number;
+      max_jobs: number;
+      interval_unit: IntervalUnit;
+      start_at: string;
+      repeat_mode: RepeatMode;
+      run_limit: number | null;
+      auto_apply_threshold: number;
+    } & DiscoveryFilters,
+  ) => request<Batch>('/api/batches', { method: 'POST', body: JSON.stringify(payload) }),
   createUploadBatch: (payload: {
     workspace_id: number;
     auto_apply_threshold: number;

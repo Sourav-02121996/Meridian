@@ -43,6 +43,39 @@ def run_migrations(engine: Engine) -> None:
                 conn.execute(
                     text("ALTER TABLE batches ADD COLUMN source VARCHAR(10) DEFAULT 'search'")
                 )
+            for column, ddl_type in (
+                ("job_title_query", "TEXT DEFAULT ''"),
+                ("technology_keywords_query", "TEXT DEFAULT ''"),
+                ("job_description_query", "TEXT DEFAULT ''"),
+                ("departments", "TEXT DEFAULT '[]'"),
+                ("seniority", "TEXT DEFAULT '[]'"),
+            ):
+                if column not in batch_columns:
+                    conn.execute(text(f"ALTER TABLE batches ADD COLUMN {column} {ddl_type}"))
+
+        if "workspaces" in inspector.get_table_names():
+            workspace_columns = {col["name"] for col in inspector.get_columns("workspaces")}
+            for column in (
+                "profile_portfolio_url",
+                "profile_github_url",
+                "profile_location",
+                "profile_current_company",
+                "profile_current_title",
+                "profile_desired_salary",
+                "profile_start_date",
+                "profile_work_authorized",
+                "profile_visa_sponsorship",
+                "profile_willing_to_relocate",
+                "profile_18_or_older",
+                "profile_gender",
+                "profile_race_ethnicity",
+                "profile_veteran_status",
+                "profile_disability_status",
+            ):
+                if column not in workspace_columns:
+                    conn.execute(
+                        text(f"ALTER TABLE workspaces ADD COLUMN {column} VARCHAR(300) DEFAULT ''")
+                    )
 
         orphaned = conn.execute(
             text("SELECT COUNT(*) FROM jobs WHERE workspace_id IS NULL")

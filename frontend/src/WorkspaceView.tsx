@@ -31,7 +31,16 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { api, Job, Status } from './api';
+import {
+  api,
+  DEPARTMENT_OPTIONS,
+  Job,
+  Profile,
+  SENIORITY_OPTIONS,
+  Status,
+  WorkspaceSettings,
+} from './api';
+import MultiSelectChips from './MultiSelectChips';
 
 const statusLabels: Record<Status, string> = {
   discovered: 'Discovered',
@@ -370,37 +379,82 @@ function ResumePanel({
   );
 }
 
+const EEO_GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Other'];
+const EEO_RACE_OPTIONS = [
+  'American Indian or Alaska Native',
+  'Asian',
+  'Black or African American',
+  'Hispanic or Latino',
+  'Native Hawaiian or Other Pacific Islander',
+  'White',
+  'Two or more races',
+  'Other',
+];
+const EEO_VETERAN_OPTIONS = ['I am a veteran', 'I am not a veteran'];
+const EEO_DISABILITY_OPTIONS = ['Yes, I have a disability', 'No, I do not have a disability'];
+
 function ProfilePanel({
   workspaceId,
   settings,
 }: {
   workspaceId: number;
-  settings?: {
-    profile_name: string;
-    profile_email: string;
-    profile_phone: string;
-    profile_linkedin: string;
-    cover_letter: string;
-  };
+  settings?: WorkspaceSettings;
 }) {
   const qc = useQueryClient();
-  const [name, setName] = useState(''),
-    [email, setEmail] = useState(''),
-    [phone, setPhone] = useState(''),
-    [linkedin, setLinkedin] = useState(''),
-    [coverLetter, setCoverLetter] = useState('');
+  const [profile, setProfile] = useState<Profile>({
+    name: '',
+    email: '',
+    phone: '',
+    linkedin: '',
+    portfolio_url: '',
+    github_url: '',
+    location: '',
+    current_company: '',
+    current_title: '',
+    desired_salary: '',
+    start_date: '',
+    work_authorized: '',
+    visa_sponsorship: '',
+    willing_to_relocate: '',
+    is_18_or_older: '',
+    gender: '',
+    race_ethnicity: '',
+    veteran_status: '',
+    disability_status: '',
+    cover_letter: '',
+  });
+  const set =
+    <K extends keyof Profile>(key: K) =>
+    (value: Profile[K]) =>
+      setProfile((current) => ({ ...current, [key]: value }));
   useEffect(() => {
     if (settings) {
-      setName(settings.profile_name);
-      setEmail(settings.profile_email);
-      setPhone(settings.profile_phone);
-      setLinkedin(settings.profile_linkedin);
-      setCoverLetter(settings.cover_letter);
+      setProfile({
+        name: settings.profile_name,
+        email: settings.profile_email,
+        phone: settings.profile_phone,
+        linkedin: settings.profile_linkedin,
+        portfolio_url: settings.profile_portfolio_url,
+        github_url: settings.profile_github_url,
+        location: settings.profile_location,
+        current_company: settings.profile_current_company,
+        current_title: settings.profile_current_title,
+        desired_salary: settings.profile_desired_salary,
+        start_date: settings.profile_start_date,
+        work_authorized: settings.profile_work_authorized,
+        visa_sponsorship: settings.profile_visa_sponsorship,
+        willing_to_relocate: settings.profile_willing_to_relocate,
+        is_18_or_older: settings.profile_18_or_older,
+        gender: settings.profile_gender,
+        race_ethnicity: settings.profile_race_ethnicity,
+        veteran_status: settings.profile_veteran_status,
+        disability_status: settings.profile_disability_status,
+        cover_letter: settings.cover_letter,
+      });
     }
   }, [settings]);
   const saveM = useMutation({
-    mutationFn: () =>
-      api.saveProfile(workspaceId, { name, email, phone, linkedin, cover_letter: coverLetter }),
+    mutationFn: () => api.saveProfile(workspaceId, profile),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings', workspaceId] }),
   });
   return (
@@ -412,44 +466,160 @@ function ProfilePanel({
         <div>
           <h2 className="font-display font-bold">Applicant profile</h2>
           <p className="text-sm text-fg/65">
-            Used to fill standard fields when a batch auto-applies on your behalf.
+            Used to fill standard fields when a batch auto-applies on your behalf. Anything left
+            blank is simply skipped — never guessed.
           </p>
         </div>
       </div>
+
+      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-fg/40">
+        Contact &amp; links
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <input
           className="field"
           placeholder="Full name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={profile.name}
+          onChange={(e) => set('name')(e.target.value)}
         />
         <input
           className="field"
           type="email"
           placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={profile.email}
+          onChange={(e) => set('email')(e.target.value)}
         />
         <input
           className="field"
           placeholder="Phone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          value={profile.phone}
+          onChange={(e) => set('phone')(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="Location (city, state, country)"
+          value={profile.location}
+          onChange={(e) => set('location')(e.target.value)}
         />
         <input
           className="field"
           placeholder="LinkedIn URL"
-          value={linkedin}
-          onChange={(e) => setLinkedin(e.target.value)}
+          value={profile.linkedin}
+          onChange={(e) => set('linkedin')(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="Portfolio / website URL"
+          value={profile.portfolio_url}
+          onChange={(e) => set('portfolio_url')(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="GitHub URL"
+          value={profile.github_url}
+          onChange={(e) => set('github_url')(e.target.value)}
         />
       </div>
+
+      <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">
+        Work details
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <input
+          className="field"
+          placeholder="Current company"
+          value={profile.current_company}
+          onChange={(e) => set('current_company')(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="Current title"
+          value={profile.current_title}
+          onChange={(e) => set('current_title')(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="Desired salary"
+          value={profile.desired_salary}
+          onChange={(e) => set('desired_salary')(e.target.value)}
+        />
+        <input
+          className="field"
+          placeholder="Earliest start date"
+          value={profile.start_date}
+          onChange={(e) => set('start_date')(e.target.value)}
+        />
+      </div>
+
+      <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">Eligibility</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <YesNoField
+          label="Authorized to work"
+          value={profile.work_authorized}
+          onChange={set('work_authorized')}
+        />
+        <YesNoField
+          label="Needs visa sponsorship"
+          value={profile.visa_sponsorship}
+          onChange={set('visa_sponsorship')}
+        />
+        <YesNoField
+          label="Willing to relocate"
+          value={profile.willing_to_relocate}
+          onChange={set('willing_to_relocate')}
+        />
+        <YesNoField
+          label="18 years or older"
+          value={profile.is_18_or_older}
+          onChange={set('is_18_or_older')}
+        />
+      </div>
+
+      <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">
+        Voluntary self-identification
+      </p>
+      <p className="mb-2 text-xs text-fg/45">
+        Optional and legally protected — left as "Decline to self-identify" unless you choose
+        otherwise.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <EeoField
+          label="Gender"
+          value={profile.gender}
+          options={EEO_GENDER_OPTIONS}
+          onChange={set('gender')}
+        />
+        <EeoField
+          label="Race / ethnicity"
+          value={profile.race_ethnicity}
+          options={EEO_RACE_OPTIONS}
+          onChange={set('race_ethnicity')}
+        />
+        <EeoField
+          label="Veteran status"
+          value={profile.veteran_status}
+          options={EEO_VETERAN_OPTIONS}
+          onChange={set('veteran_status')}
+        />
+        <EeoField
+          label="Disability status"
+          value={profile.disability_status}
+          options={EEO_DISABILITY_OPTIONS}
+          onChange={set('disability_status')}
+        />
+      </div>
+
+      <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">
+        Cover letter
+      </p>
       <textarea
-        className="field mt-3 h-20 w-full resize-none"
+        className="field h-20 w-full resize-none"
         placeholder="Optional cover letter template"
-        value={coverLetter}
-        onChange={(e) => setCoverLetter(e.target.value)}
+        value={profile.cover_letter}
+        onChange={(e) => set('cover_letter')(e.target.value)}
       />
-      <div className="mt-3 flex justify-end">
+
+      <div className="mt-4 flex justify-end">
         <button className="btn btn-dark" onClick={() => saveM.mutate()} disabled={saveM.isPending}>
           {saveM.isPending ? 'Saving…' : 'Save profile'}
         </button>
@@ -458,13 +628,85 @@ function ProfilePanel({
   );
 }
 
+function YesNoField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="text-xs font-semibold text-fg/50">
+      {label}
+      <select
+        className="field mt-1 w-full"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Not answered</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </label>
+  );
+}
+
+function EeoField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="text-xs font-semibold text-fg/50">
+      {label}
+      <select
+        className="field mt-1 w-full"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Decline to self-identify</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => void }) {
   const [query, setQuery] = useState('Software Engineer'),
     [days, setDays] = useState(2),
     [max, setMax] = useState(100),
+    [jobTitleQuery, setJobTitleQuery] = useState(''),
+    [technologyKeywordsQuery, setTechnologyKeywordsQuery] = useState(''),
+    [jobDescriptionQuery, setJobDescriptionQuery] = useState(''),
+    [departments, setDepartments] = useState<string[]>([]),
+    [seniority, setSeniority] = useState<string[]>([]),
     [polling, setPolling] = useState(false);
+  const toggle = (list: string[], setList: (v: string[]) => void, value: string) =>
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   const mutation = useMutation({
-    mutationFn: () => api.scrape(workspaceId, { query, days, max_jobs: max }),
+    mutationFn: () =>
+      api.scrape(workspaceId, {
+        query,
+        days,
+        max_jobs: max,
+        job_title_query: jobTitleQuery,
+        technology_keywords_query: technologyKeywordsQuery,
+        job_description_query: jobDescriptionQuery,
+        departments,
+        seniority,
+      }),
     onSuccess: () => setPolling(true),
   });
   const statusQ = useQuery({
@@ -504,6 +746,7 @@ function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => 
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search query"
+          placeholder="General search"
         />
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs font-semibold text-fg/65">
@@ -529,6 +772,54 @@ function Discover({ workspaceId, onDone }: { workspaceId: number; onDone: () => 
             />
           </label>
         </div>
+        <details className="group">
+          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-fg/40">
+            More filters
+          </summary>
+          <div className="mt-3 space-y-3">
+            <label className="text-xs font-semibold text-fg/65">
+              Job title (boolean query)
+              <input
+                className="field mt-1 w-full"
+                placeholder='e.g. "Software Engineer" OR "Backend Engineer"'
+                value={jobTitleQuery}
+                onChange={(e) => setJobTitleQuery(e.target.value)}
+              />
+            </label>
+            <label className="text-xs font-semibold text-fg/65">
+              Technology keywords (boolean query)
+              <input
+                className="field mt-1 w-full"
+                placeholder='e.g. "Python" AND "AWS"'
+                value={technologyKeywordsQuery}
+                onChange={(e) => setTechnologyKeywordsQuery(e.target.value)}
+              />
+            </label>
+            <label className="text-xs font-semibold text-fg/65">
+              Description keywords (boolean query)
+              <input
+                className="field mt-1 w-full"
+                placeholder='e.g. "remote" OR "unlimited PTO"'
+                value={jobDescriptionQuery}
+                onChange={(e) => setJobDescriptionQuery(e.target.value)}
+              />
+            </label>
+            <MultiSelectChips
+              label="Departments"
+              hint="Leave empty to use the default (Engineering, Software Development, IT)"
+              options={DEPARTMENT_OPTIONS}
+              selected={departments}
+              onToggle={(v) => toggle(departments, setDepartments, v)}
+            />
+            <MultiSelectChips
+              label="Seniority level"
+              hint="Leave empty to use the default (Entry + Mid level)"
+              options={SENIORITY_OPTIONS}
+              selected={seniority}
+              onToggle={(v) => toggle(seniority, setSeniority, v)}
+            />
+          </div>
+        </details>
         <button className="btn btn-dark w-full" disabled={busy}>
           {busy ? (
             <>

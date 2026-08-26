@@ -38,6 +38,11 @@ def _run_discovery(workspace_id: int, payload: ScrapeRequest):
                 payload.query,
                 payload.days,
                 payload.max_jobs,
+                departments=payload.departments,
+                seniority=payload.seniority,
+                job_title_query=payload.job_title_query,
+                technology_keywords_query=payload.technology_keywords_query,
+                job_description_query=payload.job_description_query,
                 progress=lambda count: _set_status(workspace_id, collected=count),
             )
         _set_status(workspace_id, running=False, done=True, result=result)

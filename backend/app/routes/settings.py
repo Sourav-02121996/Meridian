@@ -37,6 +37,21 @@ def read_settings(workspace_id: int, db: Session = Depends(get_db)):
         profile_email=workspace.profile_email,
         profile_phone=workspace.profile_phone,
         profile_linkedin=workspace.profile_linkedin,
+        profile_portfolio_url=workspace.profile_portfolio_url,
+        profile_github_url=workspace.profile_github_url,
+        profile_location=workspace.profile_location,
+        profile_current_company=workspace.profile_current_company,
+        profile_current_title=workspace.profile_current_title,
+        profile_desired_salary=workspace.profile_desired_salary,
+        profile_start_date=workspace.profile_start_date,
+        profile_work_authorized=workspace.profile_work_authorized,
+        profile_visa_sponsorship=workspace.profile_visa_sponsorship,
+        profile_willing_to_relocate=workspace.profile_willing_to_relocate,
+        profile_18_or_older=workspace.profile_18_or_older,
+        profile_gender=workspace.profile_gender,
+        profile_race_ethnicity=workspace.profile_race_ethnicity,
+        profile_veteran_status=workspace.profile_veteran_status,
+        profile_disability_status=workspace.profile_disability_status,
         cover_letter=workspace.cover_letter,
     )
 
@@ -109,6 +124,21 @@ def save_profile(workspace_id: int, payload: ProfileRequest, db: Session = Depen
     workspace.profile_email = payload.email
     workspace.profile_phone = payload.phone
     workspace.profile_linkedin = payload.linkedin
+    workspace.profile_portfolio_url = payload.portfolio_url
+    workspace.profile_github_url = payload.github_url
+    workspace.profile_location = payload.location
+    workspace.profile_current_company = payload.current_company
+    workspace.profile_current_title = payload.current_title
+    workspace.profile_desired_salary = payload.desired_salary
+    workspace.profile_start_date = payload.start_date
+    workspace.profile_work_authorized = payload.work_authorized
+    workspace.profile_visa_sponsorship = payload.visa_sponsorship
+    workspace.profile_willing_to_relocate = payload.willing_to_relocate
+    workspace.profile_18_or_older = payload.is_18_or_older
+    workspace.profile_gender = payload.gender
+    workspace.profile_race_ethnicity = payload.race_ethnicity
+    workspace.profile_veteran_status = payload.veteran_status
+    workspace.profile_disability_status = payload.disability_status
     workspace.cover_letter = payload.cover_letter
     db.commit()
     return {"saved": True}
