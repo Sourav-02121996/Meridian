@@ -37,41 +37,76 @@ Job searching at scale is mostly repetitive data entry: the same name, contact d
 
 ## Architecture
 
-Meridian is two processes talking over HTTP, plus a headless browser the backend drives directly:
+Meridian is two processes talking over HTTP, plus a headless browser the backend drives directly. Blue is the frontend, purple is the backend's internal engines, green marks a successful outcome (a database write or a completed submission), amber is an external service Meridian talks to, and red/dashed is the one ATS it deliberately refuses to touch.
 
+```mermaid
+flowchart LR
+    User(["🧑‍💻 You"])
+
+    subgraph FE["🖥️ FRONTEND — React + Vite · localhost:5173"]
+        UI(["Workspaces · Batches<br/>Job Pipeline<br/>Review Queue<br/>Global Dashboard"])
+    end
+
+    subgraph BE["⚙️ BACKEND — FastAPI · localhost:8000"]
+        API(["REST API — /api/*"])
+        SCHED("⏱️ Batch Scheduler<br/>APScheduler")
+        DISC("🔎 Discovery Engine<br/>Playwright crawler + extractor")
+        SCORE("📊 Résumé Scorer<br/>sentence-transformers")
+        APPLY("🤖 Auto-Apply Engine<br/>apply_adapters/")
+        DB[("🗄️ SQLite<br/>workspaces · jobs · batches")]
+    end
+
+    subgraph EXT["🌐 EXTERNAL SERVICES"]
+        HC("HiringCafe<br/>rendered job search")
+        ATSOK("✅ Supported ATS forms<br/>Greenhouse · Lever · Ashby<br/>Workable · BambooHR · ...")
+        WD("🚫 Workday<br/>excluded — unsupported flow")
+        LLM("🧠 Local Ollama<br/>optional LLM tiers<br/>résumé-grounded only")
+    end
+
+    User --> UI
+    UI <==>|HTTP JSON| API
+    SCHED --> DISC
+    SCHED --> APPLY
+    API --> DISC
+    API --> APPLY
+    DISC --> SCORE
+    SCORE --> DB
+    DISC --> DB
+    APPLY <--> DB
+    DISC ==>|scrapes| HC
+    APPLY ==>|fills & submits| ATSOK
+    APPLY -.->|refuses, no attempt| WD
+    APPLY -.->|optional| LLM
+
+    classDef groupFE fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    classDef groupBE fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
+    classDef groupEXT fill:#fffbeb,stroke:#d97706,stroke-width:2px,color:#92400e
+
+    classDef frontend fill:#2563eb,stroke:#1e3a8a,color:#ffffff,stroke-width:2px
+    classDef backend fill:#7c3aed,stroke:#4c1d95,color:#ffffff,stroke-width:2px
+    classDef db fill:#059669,stroke:#065f46,color:#ffffff,stroke-width:2px
+    classDef ext fill:#d97706,stroke:#92400e,color:#ffffff,stroke-width:2px
+    classDef blocked fill:#dc2626,stroke:#7f1d1d,color:#ffffff,stroke-width:2px,stroke-dasharray: 4 3
+    classDef user fill:#0f172a,stroke:#0f172a,color:#ffffff,stroke-width:2px
+
+    class FE groupFE
+    class BE groupBE
+    class EXT groupEXT
+    class UI frontend
+    class API,DISC,SCORE,SCHED,APPLY backend
+    class DB db
+    class HC,ATSOK,LLM ext
+    class WD blocked
+    class User user
+
+    linkStyle 1 stroke:#2563eb,stroke-width:2.5px
+    linkStyle 10 stroke:#d97706,stroke-width:2.5px
+    linkStyle 11 stroke:#16a34a,stroke-width:3px
+    linkStyle 12 stroke:#dc2626,stroke-width:2px
+    linkStyle 13 stroke:#7c3aed,stroke-width:1.5px
 ```
-┌───────────────────────────┐        HTTP (/api/*)        ┌──────────────────────────────────────┐
-│   Frontend (React + Vite) │ ───────────────────────────▶ │        Backend (FastAPI)              │
-│   http://localhost:5173   │ ◀─────────────────────────── │        http://localhost:8000          │
-│                            │        JSON responses        │                                        │
-│  Workspaces · Batches ·    │                              │  ┌──────────────┐  ┌────────────────┐  │
-│  Job pipeline · Blocked-   │                              │  │  Discovery   │  │  Scoring        │  │
-│  question review ·        │                              │  │  (crawler +  │  │  (sentence-     │  │
-│  Dashboard                │                              │  │  extractor)  │  │  transformers)  │  │
-└───────────────────────────┘                              │  └──────┬───────┘  └────────┬────────┘  │
-                                                             │         │                   │           │
-                                                             │         ▼                   ▼           │
-                                                             │  ┌────────────────────────────────────┐ │
-                                                             │  │     SQLite (workspaces, jobs,      │ │
-                                                             │  │  blocked questions, batches, runs) │ │
-                                                             │  └────────────────────────────────────┘ │
-                                                             │         ▲                   ▲           │
-                                                             │         │                   │           │
-                                                             │  ┌──────┴───────┐  ┌────────┴────────┐  │
-                                                             │  │  Scheduler   │  │  Apply adapters  │  │
-                                                             │  │ (APScheduler,│─▶│  engine (Playwright│ │
-                                                             │  │  runs batches)│  │  fills & submits  │ │
-                                                             │  └──────────────┘  │  real ATS forms)  │  │
-                                                             │                    └────────┬──────────┘ │
-                                                             └─────────────────────────────┼────────────┘
-                                                                                            │
-                                                                     ┌──────────────────────┼─────────────────────┐
-                                                                     ▼                       ▼                     ▼
-                                                              Greenhouse / Lever /    Workday (excluded,   Local Ollama server
-                                                              Ashby / Workable / ...   unsupported flow)   (optional LLM tiers,
-                                                              real employer forms                          answers grounded in
-                                                                                                            your résumé only)
-```
+
+> Diagram is a GitHub-flavored Mermaid chart — it renders inline on GitHub and in most Markdown previewers (e.g. VS Code with a Mermaid preview extension). If your viewer doesn't render Mermaid, the [What Meridian does](#what-meridian-does) list above covers the same flow in words.
 
 **Backend** ([backend/README.md](backend/README.md)) — a FastAPI service that owns all business logic: the Playwright-driven discovery crawler, the résumé/job-description scorer, the SQLite-backed data model, the APScheduler-driven batch runner, and the auto-apply engine (`backend/app/apply_adapters/`) that actually opens and submits real ATS forms. A four-tier confidence chain resolves each application question — your own explicit answer, a semantic match to your typed profile, and (only if you opt in) two local-LLM tiers that never see or answer EEO/compliance-sensitive questions and never run without a local Ollama server.
 
