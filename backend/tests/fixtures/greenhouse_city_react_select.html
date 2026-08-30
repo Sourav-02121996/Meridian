@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head><title>Greenhouse City react-select fixture</title></head>
+<body>
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <label for="candidate-location">Location (City)*</label>
+    <div class="select__control">
+      <div class="select__value-container">
+        <div id="candidate-location-selected" class="select__single-value"></div>
+        <input
+          id="candidate-location"
+          class="select__input"
+          role="combobox"
+          aria-required="true"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-haspopup="listbox"
+          autocomplete="off"
+        />
+      </div>
+    </div>
+    <ul id="react-select-candidate-location-listbox" role="listbox" style="display:none"></ul>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Application has been submitted';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    const cities = [
+      'Boston, Massachusetts, United States',
+      'Boston District, England, United Kingdom',
+      'Boston, England, United Kingdom',
+      'East Boston, Massachusetts, United States',
+    ];
+    const input = document.getElementById('candidate-location');
+    const listbox = document.getElementById('react-select-candidate-location-listbox');
+    const selected = document.getElementById('candidate-location-selected');
+
+    input.addEventListener('input', function () {
+      const query = input.value.toLowerCase();
+      const matches = cities.filter((city) => city.toLowerCase().startsWith(query));
+      listbox.replaceChildren();
+      matches.forEach(function (city) {
+        const option = document.createElement('li');
+        option.setAttribute('role', 'option');
+        option.textContent = city;
+        option.addEventListener('click', function () {
+          selected.textContent = city;
+          input.value = '';
+          listbox.style.display = 'none';
+        });
+        listbox.appendChild(option);
+      });
+      listbox.style.display = matches.length ? 'block' : 'none';
+    });
+  </script>
+</body>
+</html>

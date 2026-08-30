@@ -11,7 +11,8 @@ from .migrations import run_migrations
 from .routes import batches, dashboard, jobs, scrape, settings, stats, workspaces
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s | Meridian | %(levelname)s | %(message)s"
+    level=getattr(logging, get_settings().log_level.upper(), logging.INFO),
+    format="%(asctime)s | Meridian | %(levelname)s | %(message)s",
 )
 run_migrations(engine)
 

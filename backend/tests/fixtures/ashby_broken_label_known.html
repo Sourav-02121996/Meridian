@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head><title>Ashby-style broken-label field — a known field (Location)</title></head>
+<body>
+  <!-- Reproduces the exact shape confirmed live on Ashby's real "Location" field:
+       a <label for="..."> whose target id exists on no element in the DOM (the
+       input itself carries no id at all), a role="combobox" autocomplete input
+       backed by a real suggestion listbox, and no required/aria-required anywhere
+       -- only a class-marker on the label. get_by_label("Location") finds nothing
+       here; only the DOM-proximity fallback (_control_for_broken_label) can
+       resolve it, and only an actual listbox-option click (not just typed text)
+       reliably sticks -- see fields.py's module comment above _label_by_own_text
+       and fill_text's own is_combobox branch. -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <div class="ashby-application-form-field-entry">
+      <label class="ashby-application-form-question-title _required_f7cvd_91" for="_systemfield_location">Location</label>
+      <div class="_inputContainer_d7ago_28">
+        <input
+          id="location_input"
+          class="ashby-application-form-input-autocomplete"
+          placeholder="Start typing..."
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-haspopup="listbox"
+          value=""
+        />
+        <ul id="location_listbox" role="listbox" style="display:none;">
+          <li role="option">Boston, MA</li>
+          <li role="option">Boston, VA</li>
+        </ul>
+      </div>
+    </div>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    var input = document.getElementById('location_input');
+    var listbox = document.getElementById('location_listbox');
+    input.addEventListener('input', function () {
+      // Real Ashby behavior being reproduced: typing opens the suggestion list,
+      // but the input's own value only reflects what was literally typed --
+      // committing an actual answer requires clicking one of the options below.
+      listbox.style.display = input.value ? 'block' : 'none';
+    });
+    listbox.querySelectorAll('[role="option"]').forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        input.value = opt.textContent;
+        listbox.style.display = 'none';
+      });
+    });
+  </script>
+</body>
+</html>

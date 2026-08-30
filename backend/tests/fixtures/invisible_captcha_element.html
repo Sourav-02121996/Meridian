@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head><title>Invisible CAPTCHA application (element-based, non-blocking)</title></head>
+<body>
+  <!-- data-size="invisible" -- confirmed live: Greenhouse's job-boards.greenhouse.io
+       postings (Twitch, GitLab, a live Anthropic posting -- all sharing the exact
+       same reCAPTCHA Enterprise sitekey) render this way. Must NOT block the
+       attempt -- see engine.py's _blocking_captcha_present docstring. -->
+  <div class="g-recaptcha" data-sitekey="fake" data-size="invisible"></div>
+
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

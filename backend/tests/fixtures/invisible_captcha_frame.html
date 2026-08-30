@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Invisible CAPTCHA application (live-iframe-URL-based, non-blocking)</title></head>
+<body>
+  <!-- A data: URL so the frame actually navigates (giving it a real .url Playwright
+       can read) with no live network access needed -- the URL text itself carries
+       the same two signals a real reCAPTCHA Enterprise anchor iframe's src does:
+       "recaptcha" and "size=invisible", exactly as confirmed live on Twitch/
+       GitLab/Anthropic's job-boards.greenhouse.io postings. -->
+  <iframe src="data:text/html,%3Chtml%3E%3Cbody%3Erecaptcha%20size=invisible%3C%2Fbody%3E%3C%2Fhtml%3E"></iframe>
+
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

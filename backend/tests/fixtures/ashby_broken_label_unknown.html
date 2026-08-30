@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head><title>Ashby-style broken-label field — an unrecognized field</title></head>
+<body>
+  <!-- Same broken for=/id shape as ashby_broken_label_known.html, but for a plain
+       text field whose label isn't one of fields.TEXT_LABELS' known keys --
+       standing in for any future Ashby field rendered this way that Tier A simply
+       has no alias for. Before this fix, this was invisible twice over: not
+       fillable (get_by_label finds nothing), and never caught by
+       find_unhandled_required_fields either (no required/aria-required anywhere). -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <div class="ashby-application-form-field-entry">
+      <label class="ashby-application-form-question-title _required_f7cvd_91" for="_customfield_favorite_language">What is your favorite programming language?</label>
+      <div class="_inputContainer_d7ago_28">
+        <input class="ashby-application-form-input-text" placeholder="Type here..." value="" />
+      </div>
+    </div>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

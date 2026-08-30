@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head><title>Ashby-style yes/no toggle — an unrecognized screening question</title></head>
+<body>
+  <!-- Same widget shape as ashby_yesno_toggle_known.html, but with a label that
+       doesn't match any of fields.YES_NO_LABELS' known aliases — standing in for
+       any future company-specific yes/no question rendered this way. Before this
+       fix, this shape wasn't just unanswerable, it was invisible: not filled, and
+       never caught by find_unhandled_required_fields either (no required/
+       aria-required anywhere), so it silently reached Submit unanswered. -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <div class="ashby-application-form-field-entry">
+      <label class="ashby-application-form-question-title _required_f7cvd_91" for="background_check_toggle">
+        Do you consent to a background check?
+      </label>
+      <div class="ashby-application-form-input-yesno" data-testid="bg_check_group">
+        <button type="button" data-option="yes" aria-pressed="false">Yes</button>
+        <button type="button" data-option="no" aria-pressed="false">No</button>
+        <input type="checkbox" tabindex="-1" name="background_check_toggle" />
+      </div>
+    </div>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    document.querySelectorAll('[data-testid="bg_check_group"] button[data-option]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('[data-testid="bg_check_group"] button[data-option]').forEach(function (b) {
+          b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

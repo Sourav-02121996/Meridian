@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Tier B profile-similarity question</title></head>
+<body>
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <!-- Deliberately phrased so it does NOT contain any of fields.py's fixed
+         TEXT_LABELS["current_company"] aliases ("Current Company"/"Current
+         Employer") verbatim -- Tier A must NOT resolve this on its own, only
+         Tier B's semantic match against the same profile field is supposed to. -->
+    <label for="employer_question">What company do you currently work for?</label>
+    <input id="employer_question" name="employer_question" type="text" required />
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

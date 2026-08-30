@@ -12,9 +12,11 @@ import {
   Search,
   Sparkles,
   Target,
+  Trash2,
   Upload,
   UserRound,
   Users,
+  Zap,
 } from 'lucide-react';
 import {
   Bar,
@@ -40,20 +42,15 @@ import {
   Status,
   WorkspaceSettings,
 } from './api';
+import BlockedQuestionsPanel from './BlockedQuestionsPanel';
 import MultiSelectChips from './MultiSelectChips';
+import { reviewReasonLabels } from './reviewReasons';
 
 const statusLabels: Record<Status, string> = {
   discovered: 'Discovered',
   to_apply: 'To apply',
   applied: 'Applied',
   skipped: 'Skipped',
-};
-const reviewReasonLabels: Record<string, string> = {
-  below_threshold: 'Below auto-apply threshold',
-  unsupported_ats: 'ATS not supported for auto-apply',
-  no_resume_file: 'No resume PDF on file',
-  custom_questions: 'Form has custom questions',
-  form_error: "Couldn't confirm submission",
 };
 const colors = ['#2563eb', '#d89b24', '#16a34a', '#dc2626'];
 const axisTick = { fontSize: 11, fill: 'rgb(var(--fg) / 0.45)' };
@@ -112,6 +109,8 @@ function WorkspaceView({
   const jobsQ = useQuery({
     queryKey: ['jobs', workspaceId, params.toString()],
     queryFn: () => api.jobs(workspaceId, params),
+    refetchInterval: (query) =>
+      query.state.data?.some((job) => job.auto_apply_state === 'applying') ? 1000 : false,
   });
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['jobs', workspaceId] });
@@ -408,7 +407,9 @@ function ProfilePanel({
     linkedin: '',
     portfolio_url: '',
     github_url: '',
-    location: '',
+    city: '',
+    state: '',
+    country: '',
     current_company: '',
     current_title: '',
     desired_salary: '',
@@ -421,6 +422,11 @@ function ProfilePanel({
     race_ethnicity: '',
     veteran_status: '',
     disability_status: '',
+    citizenship: '',
+    security_clearance: '',
+    background_check_consent: '',
+    drug_test_consent: '',
+    criminal_history: '',
     cover_letter: '',
   });
   const set =
@@ -436,7 +442,9 @@ function ProfilePanel({
         linkedin: settings.profile_linkedin,
         portfolio_url: settings.profile_portfolio_url,
         github_url: settings.profile_github_url,
-        location: settings.profile_location,
+        city: settings.profile_city,
+        state: settings.profile_state,
+        country: settings.profile_country,
         current_company: settings.profile_current_company,
         current_title: settings.profile_current_title,
         desired_salary: settings.profile_desired_salary,
@@ -449,6 +457,11 @@ function ProfilePanel({
         race_ethnicity: settings.profile_race_ethnicity,
         veteran_status: settings.profile_veteran_status,
         disability_status: settings.profile_disability_status,
+        citizenship: settings.profile_citizenship,
+        security_clearance: settings.profile_security_clearance,
+        background_check_consent: settings.profile_background_check_consent,
+        drug_test_consent: settings.profile_drug_test_consent,
+        criminal_history: settings.profile_criminal_history,
         cover_letter: settings.cover_letter,
       });
     }
@@ -476,78 +489,48 @@ function ProfilePanel({
         Contact &amp; links
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <input
-          className="field"
-          placeholder="Full name"
-          value={profile.name}
-          onChange={(e) => set('name')(e.target.value)}
-        />
-        <input
-          className="field"
-          type="email"
-          placeholder="Email"
-          value={profile.email}
-          onChange={(e) => set('email')(e.target.value)}
-        />
-        <input
-          className="field"
-          placeholder="Phone"
-          value={profile.phone}
-          onChange={(e) => set('phone')(e.target.value)}
-        />
-        <input
-          className="field"
-          placeholder="Location (city, state, country)"
-          value={profile.location}
-          onChange={(e) => set('location')(e.target.value)}
-        />
-        <input
-          className="field"
-          placeholder="LinkedIn URL"
-          value={profile.linkedin}
-          onChange={(e) => set('linkedin')(e.target.value)}
-        />
-        <input
-          className="field"
-          placeholder="Portfolio / website URL"
+        <TextField label="Full name" value={profile.name} onChange={set('name')} />
+        <TextField label="Email" type="email" value={profile.email} onChange={set('email')} />
+        <TextField label="Phone" value={profile.phone} onChange={set('phone')} />
+        <TextField label="LinkedIn URL" value={profile.linkedin} onChange={set('linkedin')} />
+        <TextField
+          label="Portfolio / website URL"
           value={profile.portfolio_url}
-          onChange={(e) => set('portfolio_url')(e.target.value)}
+          onChange={set('portfolio_url')}
         />
-        <input
-          className="field"
-          placeholder="GitHub URL"
-          value={profile.github_url}
-          onChange={(e) => set('github_url')(e.target.value)}
-        />
+        <TextField label="GitHub URL" value={profile.github_url} onChange={set('github_url')} />
+      </div>
+
+      <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">Location</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <TextField label="City" value={profile.city} onChange={set('city')} />
+        <TextField label="State / region" value={profile.state} onChange={set('state')} />
+        <TextField label="Country" value={profile.country} onChange={set('country')} />
       </div>
 
       <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">
         Work details
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <input
-          className="field"
-          placeholder="Current company"
+        <TextField
+          label="Current company"
           value={profile.current_company}
-          onChange={(e) => set('current_company')(e.target.value)}
+          onChange={set('current_company')}
         />
-        <input
-          className="field"
-          placeholder="Current title"
+        <TextField
+          label="Current title"
           value={profile.current_title}
-          onChange={(e) => set('current_title')(e.target.value)}
+          onChange={set('current_title')}
         />
-        <input
-          className="field"
-          placeholder="Desired salary"
+        <TextField
+          label="Desired salary"
           value={profile.desired_salary}
-          onChange={(e) => set('desired_salary')(e.target.value)}
+          onChange={set('desired_salary')}
         />
-        <input
-          className="field"
-          placeholder="Earliest start date"
+        <TextField
+          label="Earliest start date"
           value={profile.start_date}
-          onChange={(e) => set('start_date')(e.target.value)}
+          onChange={set('start_date')}
         />
       </div>
 
@@ -610,6 +593,37 @@ function ProfilePanel({
       </div>
 
       <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">
+        Compliance &amp; background
+      </p>
+      <p className="mb-2 text-xs text-fg/45">
+        Left blank, a question like this is never guessed by the LLM tiers — it's sent to Needs
+        Review instead. Answered here, it's filled the same as any other profile field.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <TextField label="Citizenship" value={profile.citizenship} onChange={set('citizenship')} />
+        <TextField
+          label="Security clearance"
+          value={profile.security_clearance}
+          onChange={set('security_clearance')}
+        />
+        <YesNoField
+          label="Consent to background check"
+          value={profile.background_check_consent}
+          onChange={set('background_check_consent')}
+        />
+        <YesNoField
+          label="Consent to drug test"
+          value={profile.drug_test_consent}
+          onChange={set('drug_test_consent')}
+        />
+        <YesNoField
+          label="Ever convicted of a crime"
+          value={profile.criminal_history}
+          onChange={set('criminal_history')}
+        />
+      </div>
+
+      <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">
         Cover letter
       </p>
       <textarea
@@ -625,6 +639,30 @@ function ProfilePanel({
         </button>
       </div>
     </section>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="text-xs font-semibold text-fg/50">
+      {label}
+      <input
+        className="field mt-1 w-full"
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
   );
 }
 
@@ -1057,6 +1095,31 @@ function JobRow({
       context?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data)),
     onSettled: onChanged,
   });
+  const deleteJob = useMutation({
+    mutationFn: () => api.deleteJob(workspaceId, job.id),
+    onSuccess: onChanged,
+  });
+  // Actually re-attempts the real automated submission — distinct from "Mark
+  // applied" below, which is pure bookkeeping ("I did this myself") and never
+  // launches a browser. Intended right after approving an answer in
+  // BlockedQuestionsPanel below, but available for any needs_review reason.
+  const retry = useMutation({
+    mutationFn: () => api.retryApply(workspaceId, job.id),
+    onSuccess: onChanged,
+  });
+  const handleDelete = () => {
+    // Deletion is permanent (see routes/jobs.py::delete_job) — an extra, more
+    // specific warning for a job already marked applied, since that's the one
+    // case where deleting also erases Meridian's own record of a real
+    // submitted application, not just a discovered/skipped listing.
+    const warning =
+      job.status === 'applied'
+        ? `"${job.title}" is marked applied — deleting it removes Meridian's record of that application (it won't un-apply anywhere). Delete permanently? This can't be undone.`
+        : 'Delete permanently? This action cannot be undone.';
+    if (window.confirm(warning)) {
+      deleteJob.mutate();
+    }
+  };
   return (
     <article className={job.score >= threshold ? 'bg-fg/[.03]' : ''}>
       <div className="grid items-center gap-3 px-5 py-4 md:grid-cols-[72px_1fr_1fr_110px_130px_32px]">
@@ -1073,6 +1136,11 @@ function JobRow({
           {job.auto_apply_state === 'applied_auto' && (
             <span className="mt-1 inline-block rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-success">
               Auto-applied
+            </span>
+          )}
+          {job.auto_apply_state === 'applying' && (
+            <span className="mt-1 inline-block rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent">
+              Applying — waiting for employer response
             </span>
           )}
           {job.auto_apply_state === 'needs_review' && (
@@ -1152,6 +1220,16 @@ function JobRow({
               )}
             </div>
           </div>
+          {job.auto_apply_state === 'needs_review' && (
+            <div className="mb-5">
+              <BlockedQuestionsPanel workspaceId={workspaceId} jobId={job.id} enabled={open} />
+            </div>
+          )}
+          {job.auto_apply_state === 'needs_review' && job.last_apply_detail && (
+            <p className="mb-5 break-words rounded-lg bg-danger/5 p-3 text-xs text-danger">
+              {job.last_apply_detail}
+            </p>
+          )}
           <div className="mt-5 flex flex-wrap gap-2">
             {job.apply_url ? (
               <a
@@ -1166,10 +1244,22 @@ function JobRow({
             ) : (
               <span className="text-sm text-fg/65">No external posting URL was provided.</span>
             )}
+            {job.auto_apply_state === 'needs_review' && (
+              <button
+                className="btn bg-accent text-paper hover:brightness-110"
+                disabled={retry.isPending}
+                onClick={() => retry.mutate()}
+                title="Actually re-attempt the automated submission now"
+              >
+                <Zap size={15} />
+                Retry auto-apply
+              </button>
+            )}
             <button
               className="btn bg-fg text-paper hover:brightness-110"
               disabled={patch.isPending}
               onClick={() => patch.mutate('applied')}
+              title="Bookkeeping only — records that you applied yourself, doesn't submit anything"
             >
               Mark applied
             </button>
@@ -1180,8 +1270,22 @@ function JobRow({
             >
               Skip
             </button>
+            <button
+              className="btn bg-fg/5 text-fg/65 hover:bg-danger/10 hover:text-danger"
+              disabled={deleteJob.isPending}
+              onClick={handleDelete}
+              aria-label={`Delete ${job.title}`}
+            >
+              <Trash2 size={15} />
+              Delete
+            </button>
           </div>
+          {retry.isSuccess && (
+            <p className="mt-3 text-sm text-accent">Retry started — check back shortly.</p>
+          )}
+          {retry.error && <p className="mt-3 text-sm text-danger">{retry.error.message}</p>}
           {patch.error && <p className="mt-3 text-sm text-danger">{patch.error.message}</p>}
+          {deleteJob.error && <p className="mt-3 text-sm text-danger">{deleteJob.error.message}</p>}
         </div>
       )}
     </article>

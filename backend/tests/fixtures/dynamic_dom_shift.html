@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head><title>Filling an earlier field shifts a later field's DOM position</title></head>
+<body>
+  <!-- Reproduces the exact shape confirmed live on a real Greenhouse checkbox
+       group: checking "Option A" (the group's own JS reacting to an answer, same
+       as any real form's conditional-field behavior) inserts a new required
+       element into the DOM *before* "Option B" -- shifting Option B's position
+       among `[required], [aria-required='true']` results by one. If Option B's
+       captured locator is a positional nth() (re-resolved live, not a snapshot),
+       acting on it after this shift hits the newly-inserted element instead --
+       a plain text input, not a checkbox, so Playwright's own .check() raises
+       "Not a checkbox or radio button" exactly like the confirmed live failure.
+       See fields.py's find_unhandled_required_fields -- every captured field now
+       gets rebound to a stable id-based selector for exactly this reason. -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <label><input type="checkbox" id="opt_a" required /> Option A</label>
+    <label><input type="checkbox" id="opt_b" required /> Option B</label>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    document.getElementById('opt_a').addEventListener('change', function () {
+      if (!this.checked) return;
+      var inserted = document.createElement('input');
+      inserted.type = 'text';
+      inserted.setAttribute('aria-required', 'true');
+      inserted.style.position = 'absolute';
+      inserted.style.left = '-9999px';
+      document.getElementById('opt_b').closest('label').before(inserted);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>Application with one custom select question</title></head>
+<body>
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <label for="referral_source">How did you learn about this opportunity?</label>
+    <select id="referral_source" name="referral_source" required>
+      <option value="">Select an option</option>
+      <option value="linkedin">LinkedIn</option>
+      <option value="indeed">Indeed</option>
+      <option value="referral">Employee Referral</option>
+    </select>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

@@ -31,6 +31,9 @@ def run_migrations(engine: Engine) -> None:
             ("workspace_id", "INTEGER"),
             ("auto_apply_state", "VARCHAR(30)"),
             ("review_reason", "VARCHAR(50)"),
+            ("last_apply_started_at", "DATETIME"),
+            ("last_apply_finished_at", "DATETIME"),
+            ("last_apply_detail", "TEXT"),
             ("last_batch_run_id", "INTEGER"),
             ("source_batch_id", "INTEGER"),
         ):
@@ -55,6 +58,7 @@ def run_migrations(engine: Engine) -> None:
 
         if "workspaces" in inspector.get_table_names():
             workspace_columns = {col["name"] for col in inspector.get_columns("workspaces")}
+            new_location_columns = {"profile_city", "profile_state", "profile_country"}
             for column in (
                 "profile_portfolio_url",
                 "profile_github_url",
@@ -71,11 +75,48 @@ def run_migrations(engine: Engine) -> None:
                 "profile_race_ethnicity",
                 "profile_veteran_status",
                 "profile_disability_status",
+                "profile_citizenship",
+                "profile_security_clearance",
+                "profile_background_check_consent",
+                "profile_drug_test_consent",
+                "profile_criminal_history",
+                *new_location_columns,
             ):
                 if column not in workspace_columns:
                     conn.execute(
                         text(f"ALTER TABLE workspaces ADD COLUMN {column} VARCHAR(300) DEFAULT ''")
                     )
+
+            # One-time best-effort backfill: profile_location used to be the only
+            # field (a single freeform string like "Boston,MA, USA"); city/state/
+            # country are new and start blank on every existing workspace. Only
+            # ever splits a location that looks unambiguously like "City, State,
+            # Country" (exactly 3 comma-separated parts) — anything else is left
+            # blank for the user to fill in themselves rather than guessed wrong.
+            if not new_location_columns.issubset(workspace_columns):
+                rows = conn.execute(
+                    text(
+                        "SELECT id, profile_location FROM workspaces "
+                        "WHERE profile_location != '' "
+                        "AND (profile_city = '' OR profile_city IS NULL)"
+                    )
+                ).fetchall()
+                for row in rows:
+                    parts = [p.strip() for p in row.profile_location.split(",")]
+                    if len(parts) == 3 and all(parts):
+                        conn.execute(
+                            text(
+                                "UPDATE workspaces SET profile_city = :city, "
+                                "profile_state = :state, profile_country = :country "
+                                "WHERE id = :id"
+                            ),
+                            {
+                                "city": parts[0],
+                                "state": parts[1],
+                                "country": parts[2],
+                                "id": row.id,
+                            },
+                        )
 
         orphaned = conn.execute(
             text("SELECT COUNT(*) FROM jobs WHERE workspace_id IS NULL")

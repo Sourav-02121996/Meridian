@@ -72,6 +72,14 @@ class Workspace(Base):
     profile_linkedin: Mapped[str] = mapped_column(String(300), default="")
     profile_portfolio_url: Mapped[str] = mapped_column(String(300), default="")
     profile_github_url: Mapped[str] = mapped_column(String(300), default="")
+    # City/state/country are the fields the user actually edits (see ProfileRequest);
+    # profile_location itself is server-computed from these three on save (routes/
+    # settings.py::save_profile), never written to directly by a request — kept
+    # around because most ATS forms have one freeform "Location" field, not three
+    # separate ones, so fields.py's TEXT_LABELS["location"] still needs one string.
+    profile_city: Mapped[str] = mapped_column(String(100), default="")
+    profile_state: Mapped[str] = mapped_column(String(100), default="")
+    profile_country: Mapped[str] = mapped_column(String(100), default="")
     profile_location: Mapped[str] = mapped_column(String(200), default="")
     profile_current_company: Mapped[str] = mapped_column(String(200), default="")
     profile_current_title: Mapped[str] = mapped_column(String(200), default="")
@@ -89,6 +97,16 @@ class Workspace(Base):
     profile_race_ethnicity: Mapped[str] = mapped_column(String(100), default="")
     profile_veteran_status: Mapped[str] = mapped_column(String(100), default="")
     profile_disability_status: Mapped[str] = mapped_column(String(100), default="")
+    # Legal/compliance-sensitive screening answers. Same "explicit or left alone" rule
+    # as the EEO fields above — an LLM must never guess any of these (see
+    # llm_drafting.is_sensitive_question); the only way one of these gets filled is
+    # this stated value (Tier A exact match, or Tier B fuzzy match — see
+    # apply_adapters/profile_similarity.py), or the candidate answering it by hand.
+    profile_citizenship: Mapped[str] = mapped_column(String(100), default="")
+    profile_security_clearance: Mapped[str] = mapped_column(String(100), default="")
+    profile_background_check_consent: Mapped[str] = mapped_column(String(10), default="")
+    profile_drug_test_consent: Mapped[str] = mapped_column(String(10), default="")
+    profile_criminal_history: Mapped[str] = mapped_column(String(10), default="")
     cover_letter: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -122,8 +140,27 @@ class Job(Base):
     )
     # Set only by the batch scheduler's auto-apply pass; untouched by manual discovery/patches.
     auto_apply_state: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
-    # One of: below_threshold, unsupported_ats, no_resume_file, custom_questions, form_error.
+    # One of: below_threshold, unsupported_multi_step, no_resume_file, custom_questions,
+    # navigation_timeout, form_not_found, submit_not_found, fields_invalid_before_submit,
+    # submission_request_failed, confirmation_not_detected, unexpected_error. See
+    # app/apply_adapters/types.py for
+    # the full list and app/apply_adapters/platforms.py for unsupported_multi_step
+    # (Workday).
     review_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Durable lifecycle/diagnostic state for the latest real browser attempt. A
+    # retry request sets auto_apply_state="applying" and started_at synchronously;
+    # the background worker always writes a terminal state plus finished_at. This
+    # lets the frontend poll the actual outcome instead of refetching once while
+    # the old needs_review value is still in the database.
+    last_apply_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_apply_finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Sanitized, bounded response/error evidence from the ATS submission request.
+    # Never stores the request payload, which contains applicant PII.
+    last_apply_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_batch_run_id: Mapped[int | None] = mapped_column(
         ForeignKey("batch_runs.id"), nullable=True
     )
@@ -135,6 +172,40 @@ class Job(Base):
     date_fetched: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     date_scored: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     date_applied: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class JobBlockedQuestion(Base):
+    """One captured, still-unresolved required question from a specific auto-apply
+    attempt on a specific job. Answering it here (BlockedQuestionsPanel.tsx) is
+    pure per-job bookkeeping that lets a "Retry auto-apply" immediately fill in the
+    now-answered field — it is deliberately *not* persisted anywhere else in the
+    workspace for reuse on other jobs (the workspace-wide Q&A bank this used to
+    graduate into via a qa_bank_id link was retired: a custom question phrased
+    once by one company rarely recurs verbatim on another's form, so the standing
+    reusable-answer store wasn't paying for the review friction of maintaining it —
+    see apply_adapters/profile_similarity.py and resume_rag.py for what actually
+    generalizes across forms instead)."""
+
+    __tablename__ = "job_blocked_questions"
+    __table_args__ = (UniqueConstraint("job_id", "question_text", name="uq_jbq_job_question"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), index=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    question_text: Mapped[str] = mapped_column(Text)
+    field_type: Mapped[str] = mapped_column(String(20), default="text")
+    options: Mapped[list] = mapped_column(JSON, default=list)
+    # Populated only if LLM drafting is enabled and a draft was actually produced;
+    # stays null for a bare capture. Never auto-submitted — always awaits the human
+    # approval step below regardless of whether a draft exists.
+    drafted_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    drafted_by_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|approved|dismissed
+    answer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

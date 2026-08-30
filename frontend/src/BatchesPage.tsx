@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDown,
@@ -23,21 +23,15 @@ import {
   Status,
   Workspace,
 } from './api';
+import BlockedQuestionsPanel from './BlockedQuestionsPanel';
 import MultiSelectChips from './MultiSelectChips';
+import { reviewReasonLabels } from './reviewReasons';
 
 const intervalLabels: Record<string, string> = {
   hour: 'Every hour',
   day: 'Every day',
   week: 'Every week',
 };
-const reviewReasonLabels: Record<string, string> = {
-  below_threshold: 'Below auto-apply threshold',
-  unsupported_ats: 'ATS not supported for auto-apply',
-  no_resume_file: 'No resume PDF on file',
-  custom_questions: 'Form has custom questions',
-  form_error: "Couldn't confirm submission",
-};
-
 function scheduleSummary(batch: Batch): string {
   const start = new Date(batch.start_at).toLocaleString();
   if (!batch.interval_unit) return `One-time · ${start}`;
@@ -112,10 +106,28 @@ function BatchCard({ batch }: { batch: Batch }) {
     enabled: expanded,
   });
   const reviewQ = useQuery({
-    queryKey: ['jobs', batch.workspace_id, 'needs_review'],
+    // Scoped to this batch's own jobs when it's an upload (source_batch_id is
+    // only ever set on jobs imported that way — see routes/jobs.py's batch_id
+    // filter) — without this, every batch card queried the same workspace-wide
+    // needs_review list, so uploading 5 URLs showed every other batch's pending
+    // jobs mixed in too. A search batch has no such link on the jobs it
+    // discovers, so it keeps the workspace-wide view rather than showing nothing.
+    queryKey: [
+      'jobs',
+      batch.workspace_id,
+      'needs_review',
+      batch.source === 'upload' ? batch.id : null,
+    ],
     queryFn: () =>
-      api.jobs(batch.workspace_id, new URLSearchParams({ auto_apply_state: 'needs_review' })),
+      api.jobs(
+        batch.workspace_id,
+        new URLSearchParams({
+          auto_apply_state: 'needs_review',
+          ...(batch.source === 'upload' ? { batch_id: String(batch.id) } : {}),
+        }),
+      ),
     enabled: expanded,
+    refetchOnWindowFocus: false,
   });
   const statusPill: Record<Batch['status'], string> = {
     active: 'bg-accent/10 text-accent',
@@ -256,45 +268,128 @@ function BatchCard({ batch }: { batch: Batch }) {
 
 function ReviewRow({ job, workspaceId }: { job: Job; workspaceId: number }) {
   const qc = useQueryClient();
+  const [showQuestions, setShowQuestions] = useState(false);
+  const [retryKey, setRetryKey] = useState<number | null>(null);
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['jobs', workspaceId] });
+    qc.invalidateQueries({ queryKey: ['dashboard'] });
+  };
   const patch = useMutation({
     mutationFn: (status: Status) => api.patchJob(workspaceId, job.id, status),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['jobs', workspaceId] });
-      qc.invalidateQueries({ queryKey: ['dashboard'] });
-    },
+    onSuccess: invalidate,
   });
+  // Actually re-attempts the real automated submission (see routes/jobs.py::
+  // retry_apply) — distinct from "Mark applied" below, which is pure bookkeeping
+  // ("I did this myself") and never launches a browser. The intended flow is:
+  // answer the blocked question above, then Retry, not Mark applied — that was
+  // the exact bug this button fixes (answering + "Apply" used to just hide the
+  // row without ever actually submitting anything).
+  const retry = useMutation({
+    mutationFn: () => api.retryApply(workspaceId, job.id),
+    // Keep this needs-review row mounted while its dedicated status query polls.
+    // Invalidating the filtered list immediately would remove an `applying` job
+    // before any component remained alive to observe its terminal result.
+    onSuccess: () => setRetryKey(Date.now()),
+  });
+  const retryStatusQ = useQuery({
+    queryKey: ['job-retry-status', workspaceId, job.id, retryKey],
+    queryFn: () => api.job(workspaceId, job.id),
+    enabled: retryKey !== null,
+    refetchInterval: (query) =>
+      !query.state.data || query.state.data.auto_apply_state === 'applying' ? 1000 : false,
+  });
+  useEffect(() => {
+    const state = retryStatusQ.data?.auto_apply_state;
+    if (retryKey !== null && state && state !== 'applying') {
+      setRetryKey(null);
+      invalidate();
+    }
+  }, [retryKey, retryStatusQ.data?.auto_apply_state]);
+  const deleteJob = useMutation({
+    mutationFn: () => api.deleteJob(workspaceId, job.id),
+    onSuccess: invalidate,
+  });
+  const handleDelete = () => {
+    if (window.confirm(`Delete "${job.title}" permanently? This action cannot be undone.`)) {
+      deleteJob.mutate();
+    }
+  };
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-fg/10 px-3 py-2 text-sm">
-      <span className="mono-num rounded-lg bg-warning/15 px-2 py-1 text-xs font-bold text-warning">
-        {job.score}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold">
-          {job.title} · <span className="font-normal text-fg/65">{job.company}</span>
-        </p>
-        <p className="text-xs text-fg/65">
-          {reviewReasonLabels[job.review_reason ?? ''] ?? job.review_reason}
-        </p>
+    <div className="rounded-xl border border-fg/10 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="mono-num rounded-lg bg-warning/15 px-2 py-1 text-xs font-bold text-warning">
+          {job.score}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">
+            {job.title} · <span className="font-normal text-fg/65">{job.company}</span>
+          </p>
+          <p className="text-xs text-fg/65">
+            {reviewReasonLabels[job.review_reason ?? ''] ?? job.review_reason}
+          </p>
+        </div>
+        <button
+          className="btn btn-outline"
+          onClick={() => setShowQuestions(!showQuestions)}
+          aria-expanded={showQuestions}
+        >
+          {showQuestions ? 'Hide answers' : 'Review answers'}
+        </button>
+        {job.apply_url && (
+          <a className="btn btn-outline" href={job.apply_url} target="_blank" rel="noreferrer">
+            <ExternalLink size={14} /> Open
+          </a>
+        )}
+        <button
+          className="btn bg-accent text-paper hover:brightness-110"
+          disabled={retry.isPending || retryKey !== null}
+          onClick={() => retry.mutate()}
+          title="Actually re-attempt the automated submission now"
+        >
+          <Zap size={14} /> Retry auto-apply
+        </button>
+        <button
+          className="btn bg-fg text-paper hover:brightness-110"
+          disabled={patch.isPending}
+          onClick={() => patch.mutate('applied')}
+          title="Bookkeeping only — records that you applied yourself, doesn't submit anything"
+        >
+          Mark applied
+        </button>
+        <button
+          className="btn bg-fg/5 text-fg/65 hover:bg-fg/10"
+          disabled={patch.isPending}
+          onClick={() => patch.mutate('skipped')}
+        >
+          Skip
+        </button>
+        <button
+          className="btn bg-fg/5 text-fg/65 hover:bg-danger/10 hover:text-danger"
+          disabled={deleteJob.isPending}
+          onClick={handleDelete}
+          aria-label={`Delete ${job.title}`}
+        >
+          <Trash2 size={14} />
+          Delete
+        </button>
       </div>
-      {job.apply_url && (
-        <a className="btn btn-outline" href={job.apply_url} target="_blank" rel="noreferrer">
-          <ExternalLink size={14} /> Open
-        </a>
+      {retryKey !== null && (
+        <p className="mt-2 text-xs text-accent">
+          {retryStatusQ.data?.auto_apply_state === 'applying'
+            ? 'Applying now — waiting for the employer response…'
+            : 'Starting browser attempt…'}
+        </p>
       )}
-      <button
-        className="btn bg-fg text-paper hover:brightness-110"
-        disabled={patch.isPending}
-        onClick={() => patch.mutate('applied')}
-      >
-        Apply
-      </button>
-      <button
-        className="btn bg-fg/5 text-fg/65 hover:bg-fg/10"
-        disabled={patch.isPending}
-        onClick={() => patch.mutate('skipped')}
-      >
-        Skip
-      </button>
+      {retry.error && <p className="mt-2 text-xs text-danger">{retry.error.message}</p>}
+      {retryKey === null && job.last_apply_detail && (
+        <p className="mt-2 break-words text-xs text-danger">{job.last_apply_detail}</p>
+      )}
+      {deleteJob.error && <p className="mt-2 text-xs text-danger">{deleteJob.error.message}</p>}
+      {showQuestions && (
+        <div className="mt-3">
+          <BlockedQuestionsPanel workspaceId={workspaceId} jobId={job.id} enabled={showQuestions} />
+        </div>
+      )}
     </div>
   );
 }
