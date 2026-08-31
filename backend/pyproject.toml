@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+# The plain `pytest` console script (unlike `python -m pytest`) does not add the
+# current working directory to sys.path, so `import app...` in the test suite
+# fails when CI invokes `pytest tests/ -v` from inside backend/. Pointing
+# pythonpath at this directory makes collection work the same way regardless
+# of how pytest is invoked.
+pythonpath = ["."]

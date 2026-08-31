@@ -20,16 +20,16 @@ A user creates one or more **workspaces**, each holding a résumé, an applicant
 
 ## 2. Tech stack
 
-| Concern | Library |
-|---|---|
-| Framework | React 18.3 |
-| Language | TypeScript 5.5 (strict mode) |
-| Build tool | Vite 8 with `@vitejs/plugin-react` |
-| Styling | Tailwind CSS 3.4 + PostCSS/Autoprefixer |
-| Server-state / data fetching | TanStack React Query 5 |
-| Charts | Recharts |
-| Icons | lucide-react |
-| Formatting | Prettier (no ESLint is configured — type safety and Prettier are the only automated code-quality gates) |
+| Concern                      | Library                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Framework                    | React 18.3                                                                                              |
+| Language                     | TypeScript 5.5 (strict mode)                                                                            |
+| Build tool                   | Vite 8 with `@vitejs/plugin-react`                                                                      |
+| Styling                      | Tailwind CSS 3.4 + PostCSS/Autoprefixer                                                                 |
+| Server-state / data fetching | TanStack React Query 5                                                                                  |
+| Charts                       | Recharts                                                                                                |
+| Icons                        | lucide-react                                                                                            |
+| Formatting                   | Prettier (no ESLint is configured — type safety and Prettier are the only automated code-quality gates) |
 
 There is no client-side router (navigation is a small hand-rolled view state machine — see §7) and no test framework configured.
 
@@ -85,6 +85,7 @@ No environment variables are required — there is no `VITE_API_URL` or `.env` f
 **Workspaces** (`WorkspaceGrid.tsx`) — a card grid of every workspace with its job/applied/above-threshold counts, a "New workspace" tile, and per-card delete (with confirmation).
 
 **Workspace detail** (`WorkspaceView.tsx`) — the main working screen:
+
 - **Résumé** — paste text or upload a PDF (extracted server-side); the uploaded file itself is what gets attached to automated applications later.
 - **Applicant profile** — the structured form (contact info, location, work eligibility, EEO self-identification, compliance fields, cover letter) that the backend's automated apply engine matches form questions against. Fields left blank are skipped by automation, never guessed.
 - **Thresholds** — two independent sliders: the general match threshold (affects "strong match" highlighting only) and the auto-apply threshold (actually gates automated submission).
