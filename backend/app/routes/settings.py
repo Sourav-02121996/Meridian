@@ -39,6 +39,9 @@ def read_settings(workspace_id: int, db: Session = Depends(get_db)):
         profile_linkedin=workspace.profile_linkedin,
         profile_portfolio_url=workspace.profile_portfolio_url,
         profile_github_url=workspace.profile_github_url,
+        profile_city=workspace.profile_city,
+        profile_state=workspace.profile_state,
+        profile_country=workspace.profile_country,
         profile_location=workspace.profile_location,
         profile_current_company=workspace.profile_current_company,
         profile_current_title=workspace.profile_current_title,
@@ -52,6 +55,11 @@ def read_settings(workspace_id: int, db: Session = Depends(get_db)):
         profile_race_ethnicity=workspace.profile_race_ethnicity,
         profile_veteran_status=workspace.profile_veteran_status,
         profile_disability_status=workspace.profile_disability_status,
+        profile_citizenship=workspace.profile_citizenship,
+        profile_security_clearance=workspace.profile_security_clearance,
+        profile_background_check_consent=workspace.profile_background_check_consent,
+        profile_drug_test_consent=workspace.profile_drug_test_consent,
+        profile_criminal_history=workspace.profile_criminal_history,
         cover_letter=workspace.cover_letter,
     )
 
@@ -126,7 +134,17 @@ def save_profile(workspace_id: int, payload: ProfileRequest, db: Session = Depen
     workspace.profile_linkedin = payload.linkedin
     workspace.profile_portfolio_url = payload.portfolio_url
     workspace.profile_github_url = payload.github_url
-    workspace.profile_location = payload.location
+    workspace.profile_city = payload.city
+    workspace.profile_state = payload.state
+    workspace.profile_country = payload.country
+    # profile_location is never set directly from the request — it's the one
+    # combined string most ATS "Location" fields actually expect (see
+    # fields.py's TEXT_LABELS["location"]), composed here so there's a single
+    # source of truth instead of the city/state/country fields and a separate
+    # freeform one drifting out of sync.
+    workspace.profile_location = ", ".join(
+        part for part in (payload.city, payload.state, payload.country) if part.strip()
+    )
     workspace.profile_current_company = payload.current_company
     workspace.profile_current_title = payload.current_title
     workspace.profile_desired_salary = payload.desired_salary
@@ -139,6 +157,11 @@ def save_profile(workspace_id: int, payload: ProfileRequest, db: Session = Depen
     workspace.profile_race_ethnicity = payload.race_ethnicity
     workspace.profile_veteran_status = payload.veteran_status
     workspace.profile_disability_status = payload.disability_status
+    workspace.profile_citizenship = payload.citizenship
+    workspace.profile_security_clearance = payload.security_clearance
+    workspace.profile_background_check_consent = payload.background_check_consent
+    workspace.profile_drug_test_consent = payload.drug_test_consent
+    workspace.profile_criminal_history = payload.criminal_history
     workspace.cover_letter = payload.cover_letter
     db.commit()
     return {"saved": True}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head><title>Required checkbox group with None</title></head>
+<body>
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <fieldset>
+      <legend>Creator Economy experience</legend>
+      <label><input id="platform_tiktok" name="platforms[]" type="checkbox" required /> TikTok</label>
+      <label><input id="platform_youtube" name="platforms[]" type="checkbox" required /> YouTube</label>
+      <label><input id="platform_none" name="platforms[]" type="checkbox" required /> None</label>
+    </fieldset>
+
+    <button
+      type="button"
+      onclick="document.getElementById('confirmation').textContent = 'Application has been submitted';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

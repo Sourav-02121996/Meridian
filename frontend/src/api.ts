@@ -1,5 +1,5 @@
 export type Status = 'discovered' | 'to_apply' | 'applied' | 'skipped';
-export type AutoApplyState = 'applied_auto' | 'needs_review' | null;
+export type AutoApplyState = 'applied_auto' | 'needs_review' | 'applying' | null;
 
 export interface Job {
   id: number;
@@ -19,6 +19,10 @@ export interface Job {
   status: Status;
   auto_apply_state: AutoApplyState;
   review_reason: string | null;
+  last_apply_started_at: string | null;
+  last_apply_finished_at: string | null;
+  last_apply_detail: string | null;
+  source_batch_id: number | null;
   date_fetched: string;
   date_scored: string | null;
   date_applied: string | null;
@@ -48,6 +52,9 @@ export interface WorkspaceSettings {
   profile_linkedin: string;
   profile_portfolio_url: string;
   profile_github_url: string;
+  profile_city: string;
+  profile_state: string;
+  profile_country: string;
   profile_location: string;
   profile_current_company: string;
   profile_current_title: string;
@@ -61,6 +68,11 @@ export interface WorkspaceSettings {
   profile_race_ethnicity: string;
   profile_veteran_status: string;
   profile_disability_status: string;
+  profile_citizenship: string;
+  profile_security_clearance: string;
+  profile_background_check_consent: string;
+  profile_drug_test_consent: string;
+  profile_criminal_history: string;
   cover_letter: string;
 }
 
@@ -71,7 +83,9 @@ export interface Profile {
   linkedin: string;
   portfolio_url: string;
   github_url: string;
-  location: string;
+  city: string;
+  state: string;
+  country: string;
   current_company: string;
   current_title: string;
   desired_salary: string;
@@ -84,6 +98,11 @@ export interface Profile {
   race_ethnicity: string;
   veteran_status: string;
   disability_status: string;
+  citizenship: string;
+  security_clearance: string;
+  background_check_consent: string;
+  drug_test_consent: string;
+  criminal_history: string;
   cover_letter: string;
 }
 
@@ -176,6 +195,21 @@ export interface BatchRun {
   error: string | null;
 }
 
+export type QuestionFieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox';
+
+export interface JobBlockedQuestion {
+  id: number;
+  job_id: number;
+  question_text: string;
+  field_type: QuestionFieldType;
+  options: string[];
+  drafted_answer: string | null;
+  drafted_by_model: string | null;
+  status: 'pending' | 'approved' | 'dismissed';
+  answer_text: string | null;
+  created_at: string;
+}
+
 export interface DashboardStats {
   workspace_count: number;
   total_jobs: number;
@@ -259,12 +293,21 @@ export const api = {
 
   jobs: (workspaceId: number, params: URLSearchParams) =>
     request<Job[]>(`/api/workspaces/${workspaceId}/jobs?${params}`),
+  job: (workspaceId: number, id: number) =>
+    request<Job>(`/api/workspaces/${workspaceId}/jobs/${id}`),
   stats: (workspaceId: number) => request<Stats>(`/api/workspaces/${workspaceId}/stats`),
   patchJob: (workspaceId: number, id: number, status: Status) =>
     request<Job>(`/api/workspaces/${workspaceId}/jobs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+  deleteJob: (workspaceId: number, id: number) =>
+    request<void>(`/api/workspaces/${workspaceId}/jobs/${id}`, { method: 'DELETE' }),
+  retryApply: (workspaceId: number, id: number) =>
+    request<{ started: boolean; state: 'applying' }>(
+      `/api/workspaces/${workspaceId}/jobs/${id}/retry-apply`,
+      { method: 'POST' },
+    ),
   scrape: (
     workspaceId: number,
     payload: { query: string; days: number; max_jobs: number } & Partial<DiscoveryFilters>,
@@ -316,4 +359,17 @@ export const api = {
   batchRuns: (id: number) => request<BatchRun[]>(`/api/batches/${id}/runs`),
   runBatchNow: (id: number) =>
     request<{ started: boolean }>(`/api/batches/${id}/run-now`, { method: 'POST' }),
+
+  blockedQuestions: (workspaceId: number, jobId: number) =>
+    request<JobBlockedQuestion[]>(`/api/workspaces/${workspaceId}/jobs/${jobId}/blocked-questions`),
+  answerBlockedQuestion: (workspaceId: number, jobId: number, bqId: number, answerText: string) =>
+    request<JobBlockedQuestion>(
+      `/api/workspaces/${workspaceId}/jobs/${jobId}/blocked-questions/${bqId}/answer`,
+      { method: 'POST', body: JSON.stringify({ answer_text: answerText }) },
+    ),
+  dismissBlockedQuestion: (workspaceId: number, jobId: number, bqId: number) =>
+    request<JobBlockedQuestion>(
+      `/api/workspaces/${workspaceId}/jobs/${jobId}/blocked-questions/${bqId}/dismiss`,
+      { method: 'POST' },
+    ),
 };

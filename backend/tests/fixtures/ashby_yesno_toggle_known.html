@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head><title>Ashby-style yes/no toggle — a known screening question</title></head>
+<body>
+  <!-- Reproduces the exact shape confirmed live on Ashby (see fields.py's
+       _yesno_toggle_* helpers): a <label for="..."> whose target id exists nowhere
+       else in the DOM, a plain button pair carrying the real answer state via
+       aria-pressed (not role="radio"), and a hidden proxy <input> whose *name*
+       (not id) is the only thing tying it back to the question. Neither button
+       nor the proxy carries required/aria-required — the only "this is required"
+       signal is the CSS-module-style class on the label itself. -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <div class="ashby-application-form-field-entry">
+      <label class="ashby-application-form-question-title _required_f7cvd_91" for="work_auth_toggle">
+        Are you authorized to work in the country this role is listed in?
+      </label>
+      <div class="ashby-application-form-input-yesno" data-testid="work_auth_group">
+        <button type="button" data-option="yes" aria-pressed="false">Yes</button>
+        <button type="button" data-option="no" aria-pressed="false">No</button>
+        <input type="checkbox" tabindex="-1" name="work_auth_toggle" />
+      </div>
+    </div>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    document.querySelectorAll('[data-testid="work_auth_group"] button[data-option]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('[data-testid="work_auth_group"] button[data-option]').forEach(function (b) {
+          b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

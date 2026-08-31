@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Native submit with hidden validation proxy</title></head>
+<body>
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <input required aria-hidden="true" tabindex="-1" />
+
+    <button type="submit">Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    document.getElementById('app-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      document.getElementById('confirmation').textContent = 'Application has been submitted';
+    });
+  </script>
+</body>
+</html>

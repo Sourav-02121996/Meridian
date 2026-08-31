@@ -25,6 +25,10 @@ class JobOut(BaseModel):
     status: JobStatus
     auto_apply_state: str | None
     review_reason: str | None
+    last_apply_started_at: datetime | None
+    last_apply_finished_at: datetime | None
+    last_apply_detail: str | None
+    source_batch_id: int | None
     date_fetched: datetime
     date_scored: datetime | None
     date_applied: datetime | None
@@ -66,7 +70,9 @@ class ProfileRequest(BaseModel):
     linkedin: str = ""
     portfolio_url: str = ""
     github_url: str = ""
-    location: str = ""
+    city: str = ""
+    state: str = ""
+    country: str = ""
     current_company: str = ""
     current_title: str = ""
     desired_salary: str = ""
@@ -79,6 +85,11 @@ class ProfileRequest(BaseModel):
     race_ethnicity: str = ""
     veteran_status: str = ""
     disability_status: str = ""
+    citizenship: str = ""
+    security_clearance: str = ""
+    background_check_consent: str = ""
+    drug_test_consent: str = ""
+    criminal_history: str = ""
     cover_letter: str = ""
 
 
@@ -116,6 +127,9 @@ class WorkspaceSettingsOut(BaseModel):
     profile_linkedin: str
     profile_portfolio_url: str
     profile_github_url: str
+    profile_city: str
+    profile_state: str
+    profile_country: str
     profile_location: str
     profile_current_company: str
     profile_current_title: str
@@ -129,6 +143,11 @@ class WorkspaceSettingsOut(BaseModel):
     profile_race_ethnicity: str
     profile_veteran_status: str
     profile_disability_status: str
+    profile_citizenship: str
+    profile_security_clearance: str
+    profile_background_check_consent: str
+    profile_drug_test_consent: str
+    profile_criminal_history: str
     cover_letter: str
 
 
@@ -177,6 +196,27 @@ class BatchOut(BaseModel):
     next_run_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+FieldType = Literal["text", "textarea", "select", "radio", "checkbox"]
+
+
+class BlockedQuestionAnswer(BaseModel):
+    answer_text: str = Field(min_length=1, max_length=2000)
+
+
+class JobBlockedQuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    job_id: int
+    question_text: str
+    field_type: str
+    options: list[str]
+    drafted_answer: str | None
+    drafted_by_model: str | None
+    status: str
+    answer_text: str | None
+    created_at: datetime
 
 
 class BatchRunOut(BaseModel):

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head><title>Ashby Frontend Platform control model</title></head>
+<body>
+  <!-- Reproduces the two control shapes observed together on Harvey's live
+       Frontend Platform application. Neither control has required or
+       aria-required. Requiredness exists only as a class on a dangling question
+       label, so native validity and the old required-control scan cannot see it. -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <div class="ashby-application-form-field-entry">
+      <label class="ashby-application-form-question-title _required_f7cvd_91"
+             for="_systemfield_location">Location</label>
+      <div class="_inputContainer_d7ago_28">
+        <input class="ashby-application-form-input-autocomplete"
+               placeholder="Start typing..."
+               role="combobox"
+               aria-autocomplete="list"
+               aria-expanded="false"
+               aria-haspopup="listbox"
+               value="" />
+        <ul role="listbox" style="display:none;">
+          <li role="option">Boston, Massachusetts, United States</li>
+          <li role="option">Boston, Lincolnshire, United Kingdom</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ashby-application-form-field-entry">
+      <label class="ashby-application-form-question-title _required_f7cvd_91"
+             for="_customfield_hybrid_location">
+        This role is tied to the office location listed in the job posting. Team members are expected to work from the office 3 days per week as part of Harvey's hybrid work model. Are you currently based in the listed location and able to work in person 3 days per week?
+      </label>
+      <div class="ashby-application-form-radio-group">
+        <input id="hybrid_based" type="radio" name="hybrid_location"
+               value="based" />
+        <label for="hybrid_based">Yes, I'm based in this location and able to work from the office 3 days per week</label>
+
+        <input id="hybrid_relocate" type="radio" name="hybrid_location"
+               value="relocate" />
+        <label for="hybrid_relocate">No, I'm not based in this location but willing to relocate</label>
+
+        <input id="hybrid_remote" type="radio" name="hybrid_location"
+               value="remote" />
+        <label for="hybrid_remote">No, I'm only able to work remotely</label>
+
+        <input id="hybrid_other" type="radio" name="hybrid_location"
+               value="other" />
+        <label for="hybrid_other">Other (optional context)</label>
+      </div>
+    </div>
+
+    <button type="button" id="submit-btn">Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    var locationInput = document.querySelector('[role="combobox"]');
+    var listbox = document.querySelector('[role="listbox"]');
+    var locationCommitted = false;
+    locationInput.addEventListener('input', function () {
+      locationCommitted = false;
+      listbox.style.display = locationInput.value ? 'block' : 'none';
+    });
+    listbox.querySelectorAll('[role="option"]').forEach(function (option) {
+      option.addEventListener('click', function () {
+        locationInput.value = option.textContent;
+        locationCommitted = true;
+        listbox.style.display = 'none';
+      });
+    });
+    document.getElementById('submit-btn').addEventListener('click', function () {
+      if (locationCommitted && document.querySelector('input[name="hybrid_location"]:checked')) {
+        document.getElementById('confirmation').textContent = 'Thank you for applying!';
+      }
+    });
+  </script>
+</body>
+</html>

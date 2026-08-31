@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head><title>Greenhouse-style freeform combobox question</title></head>
+<body>
+  <!-- Reproduces the exact shape confirmed live on a real Greenhouse posting
+       (Twitch): a required question rendered as role="combobox" purely for
+       consistent styling with the ATS's other pick-list questions, but with no
+       real backing option list at all -- an "essay" free-text answer, not a
+       closed set. Its own #react-select-{id}-listbox element exists in the DOM
+       (as it does live) but never has any [role="option"] children, no matter
+       what's typed. See fields.py's _fill_react_select "saw_any_option"
+       fallback -- before that fix, this shape could be *matched* by a Q&A bank
+       answer but never actually *filled*, since the strict select-a-real-option
+       mechanism has nothing to select from here. -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <label for="essay_question">Describe your experience with our product.*</label>
+    <input id="essay_question" role="combobox" aria-haspopup="listbox" required />
+    <ul id="react-select-essay_question-listbox" role="listbox" style="display:none;"></ul>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

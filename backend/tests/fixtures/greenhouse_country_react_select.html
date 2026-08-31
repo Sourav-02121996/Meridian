@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head><title>Greenhouse Country react-select fixture</title></head>
+<body>
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <label for="country">Country*</label>
+    <div class="select__control">
+      <div class="select__value-container">
+        <div id="country-selected" class="select__single-value"></div>
+        <input id="country" class="select__input" role="combobox" aria-required="true" />
+      </div>
+    </div>
+    <ul id="react-select-country-listbox" role="listbox" style="display:none"></ul>
+
+    <button
+      type="button"
+      onclick="document.getElementById('confirmation').textContent = 'Application has been submitted';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+  <script>
+    const input = document.getElementById('country');
+    const listbox = document.getElementById('react-select-country-listbox');
+    const selected = document.getElementById('country-selected');
+    input.addEventListener('input', function () {
+      const option = document.createElement('li');
+      option.setAttribute('role', 'option');
+      option.textContent = 'United States +1';
+      option.addEventListener('click', function () {
+        selected.textContent = '+1';
+        input.value = '';
+        listbox.style.display = 'none';
+      });
+      listbox.replaceChildren(option);
+      listbox.style.display = 'block';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head><title>A required field whose id contains CSS-special characters</title></head>
+<body>
+  <!-- Reproduces the exact shape confirmed live on Greenhouse: a checkbox-group
+       option with an array-style id containing literal square brackets, e.g.
+       "question_37744068002[]_251382496002". A raw f"#{id}" CSS id selector
+       can't parse this at all -- `[` opens an attribute-selector clause in CSS
+       syntax, so the whole selector is a SyntaxError, not just a non-match. See
+       fields.py's _by_id helper, which every id-rebind in this file must use
+       instead of interpolating directly into a `#`-selector. -->
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <label><input type="checkbox" id="question_123[]_456" required /> Bracketed option</label>
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

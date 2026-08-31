@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head><title>CAPTCHA-protected application (visible/blocking)</title></head>
+<body>
+  <!-- Mirrors the real signal (a reCAPTCHA iframe) via its title attribute rather
+       than a live src, since fixture pages load with no network access. No
+       data-size attribute -- defaults to the *visible*, blocking case (real
+       widgets default to a visible checkbox unless explicitly configured
+       invisible), same as Lever's real hCaptcha widget confirmed live on
+       Symplicity's posting. -->
+  <iframe title="reCAPTCHA" src="about:blank"></iframe>
+
+  <form id="app-form">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" type="text" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <button
+      type="button"
+      id="submit-btn"
+      onclick="document.getElementById('confirmation').textContent = 'Thank you for applying!';"
+    >Submit Application</button>
+    <div id="confirmation"></div>
+  </form>
+</body>
+</html>

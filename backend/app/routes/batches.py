@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 
 from .. import scheduler as scheduler_module
 from ..db import get_db
-from ..models import Batch, BatchRepeatMode, BatchRun, BatchSource, BatchStatus, Workspace
+from ..models import Batch, BatchRepeatMode, BatchRun, BatchSource, BatchStatus, Job, Workspace
 from ..scheduler import run_batch, schedule_batch, unschedule_batch
 from ..schemas import BatchCreate, BatchOut, BatchPatch, BatchRunOut
-from ..sheet_import import SheetImportError, build_jobs_from_rows, parse_sheet
+from ..sheet_import import SheetImportError, parse_sheet, upsert_jobs_from_rows
 
 router = APIRouter(prefix="/api/batches", tags=["batches"])
 
@@ -118,7 +118,7 @@ async def create_upload_batch(
     db.add(batch)
     db.commit()
     db.refresh(batch)
-    db.add_all(build_jobs_from_rows(rows, workspace.id, batch.id))
+    upsert_jobs_from_rows(db, rows, workspace.id, batch.id)
     db.commit()
     schedule_batch(batch)
     return _out(batch, workspace.name)
@@ -162,11 +162,20 @@ def patch_batch(batch_id: int, payload: BatchPatch, db: Session = Depends(get_db
 
 @router.delete("/{batch_id}", status_code=204)
 def delete_batch(batch_id: int, db: Session = Depends(get_db)):
+    """Jobs an upload batch imported are left in place — they're independent
+    results, not part of the batch itself — but their `source_batch_id` back-
+    reference must be cleared here, not just left dangling. `batches.id` has no
+    AUTOINCREMENT, so once this row is gone the id can be reused by a completely
+    unrelated future batch; without this, that new batch's own run would silently
+    inherit these old jobs as if they were its own (see scheduler._run_batch's
+    workspace-scoped query, which guards the same failure mode from the other
+    side, for a job that slips through some other way)."""
     batch = db.get(Batch, batch_id)
     if not batch:
         raise HTTPException(404, "Batch not found")
     unschedule_batch(batch.id)
     db.query(BatchRun).filter(BatchRun.batch_id == batch.id).delete()
+    db.query(Job).filter(Job.source_batch_id == batch.id).update({"source_batch_id": None})
     db.delete(batch)
     db.commit()
 

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head><title>Ashby field-save serialization fixture</title></head>
+<body>
+  <form>
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="first_name" required />
+
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="last_name" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="resume">Resume</label>
+    <input id="resume" name="resume" type="file" required />
+
+    <button type="button" id="submit">Submit Application</button>
+  </form>
+  <script>
+    window.activeSaves = 0;
+    window.maxConcurrentSaves = 0;
+
+    function saveField(path) {
+      window.activeSaves += 1;
+      window.maxConcurrentSaves = Math.max(window.maxConcurrentSaves, window.activeSaves);
+      return fetch('https://ats.test/field-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationName: 'ApiSetFormValue', variables: { path: path } }),
+      }).finally(function () {
+        window.activeSaves -= 1;
+      });
+    }
+
+    document.querySelectorAll('input:not([type=file])').forEach(function (input) {
+      input.addEventListener('input', function () { saveField(input.name); });
+    });
+    document.getElementById('resume').addEventListener('change', function () { saveField('resume'); });
+    document.getElementById('submit').addEventListener('click', function () {
+      document.body.insertAdjacentHTML('beforeend', '<p>Application has been submitted</p>');
+    });
+  </script>
+</body>
+</html>
