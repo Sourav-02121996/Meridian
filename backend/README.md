@@ -42,10 +42,11 @@ Meridian organizes work into **workspaces** (one résumé, one applicant profile
 | Résumé PDF extraction | `pypdf` |
 | Excel import/export | `openpyxl` |
 | Scheduling | `APScheduler` `>=3.10,<4` (in-process `BackgroundScheduler`) |
+| Schema migrations | `alembic` `>=1.13,<2` — versioned migrations in `alembic/versions/`, wrapped by `app/db_migrations.py` (see [§4](#4-setup)) |
 | Local LLM client | `httpx`, talking to a local [Ollama](https://ollama.com/) server (no cloud LLM, no API key) |
 | Lint / test (dev only) | `ruff`, `pytest` |
 
-There is no Alembic and no external vector database — schema evolution is a small hand-rolled routine (`app/migrations.py`), and embeddings are computed on the fly against an in-process model cache.
+There is no external vector database — embeddings are computed on the fly against an in-process model cache. Schema is owned by Alembic; `app/migrations.py` remains only as the one-time catch-up step for databases created before Alembic was introduced.
 
 ## 3. Project layout
 
@@ -57,7 +58,8 @@ backend/
 │   ├── db.py                 # SQLAlchemy engine / session / Base
 │   ├── models.py             # ORM models: Workspace, Job, JobBlockedQuestion, Batch, BatchRun, Setting
 │   ├── schemas.py             # Pydantic request/response DTOs
-│   ├── migrations.py          # Idempotent, Alembic-free schema evolution
+│   ├── db_migrations.py       # Alembic wrapper: startup check, upgrade/downgrade/stamp, legacy adopt
+│   ├── migrations.py          # One-time pre-Alembic catch-up (not run on startup any more)
 │   ├── scheduler.py            # Batch orchestration, auto-apply decision gate, answer-lookup tier chain
 │   ├── crawler.py              # Playwright scraper for HiringCafe's rendered search results
 │   ├── discovery.py            # crawl → extract → score → upsert Job rows, per workspace
@@ -81,10 +83,12 @@ backend/
 │   └── routes/                                  # One router per resource — see §7
 ├── assisted_apply.py           # Standalone, fully manual script — opens jobs in a visible browser, human submits
 ├── tests/                        # pytest suite + local ATS HTML fixtures (see §10)
-├── requirements.txt               # Runtime dependencies
-├── requirements-dev.txt            # + ruff, pytest
-├── .env.example                     # Sample configuration (see §6 for the full variable list)
-└── DEBUGGING.md                       # How to trace a real or fixture-driven auto-apply run
+├── alembic/                        # Migration environment (env.py) + alembic/versions/*
+├── alembic.ini                      # Alembic config; DB URL is left blank and resolved from DB_URL
+├── requirements.txt                  # Runtime dependencies
+├── requirements-dev.txt               # + ruff, pytest
+├── .env.example                        # Sample configuration (see §6 for the full variable list)
+└── DEBUGGING.md                          # How to trace a real or fixture-driven auto-apply run
 ```
 
 ## 4. Setup
@@ -100,18 +104,80 @@ python -m pip install -r backend/requirements-dev.txt   # or requirements.txt fo
 python -m playwright install chromium                     # Playwright's browser binary isn't pulled in by pip
 
 cp backend/.env.example backend/.env                        # then edit as needed, see §6
+
+cd backend && python -m app.db_migrations upgrade          # create / update the database schema
 ```
 
-No manual database setup is required — `main.py` runs `run_migrations(engine)` automatically at startup, creating tables and applying incremental `ALTER TABLE`s idempotently against the SQLite file at `db_url`.
+### Database migrations
+
+Schema is managed by **Alembic**. All commands below are run from `backend/` and
+act on the database at `DB_URL` (default `sqlite:///./meridian.db`); the URL is
+read from `.env`, not from `alembic.ini`. `./run.sh` runs `upgrade` for you before
+starting the server, and `main.py` refuses to boot with a clear message if the
+schema is behind.
+
+| Command | What it does |
+|---|---|
+| `python -m app.db_migrations upgrade` | Apply all pending migrations (→ latest). Safe to re-run. |
+| `python -m app.db_migrations current` | Print the revision the database is stamped at. |
+| `python -m app.db_migrations check` | Exit non-zero if the database is not at the latest revision. |
+| `python -m app.db_migrations downgrade -1` | Roll back the most recent migration. |
+| `python -m app.db_migrations stamp head` | Mark the database as up to date **without running any SQL** (use only when you know the schema already matches). |
+| `python -m app.db_migrations adopt` | Bring a pre-Alembic database under Alembic control — see below. |
+
+Equivalent raw Alembic also works: `alembic upgrade head`, `alembic history`,
+`alembic revision --autogenerate -m "..."`, etc. — `alembic/env.py` supplies the
+URL and model metadata, and turns on batch mode so column changes work on SQLite.
+
+**Creating a migration after changing `models.py`:**
+
+```bash
+cd backend
+alembic revision --autogenerate -m "add X to workspaces"
+#   review the generated file in alembic/versions/ — autogenerate is a draft,
+#   not gospel (it can miss server-default and CHECK-constraint changes)
+python -m app.db_migrations upgrade
+```
+
+**Databases created before Alembic** (the `run_migrations` era) have no
+`alembic_version` table. `upgrade` detects this and stops with a pointer to
+`adopt` rather than trying to re-create existing tables; `adopt` is what you run:
+
+```bash
+cd backend
+cp meridian.db meridian.db.bak          # always back up first
+python -m app.db_migrations adopt
+```
+
+`adopt` runs the old one-shot catch-up (`app/migrations.py`: adds any missing
+columns, folds a legacy single-workspace DB into a "Default" workspace), stamps
+the result at the Alembic baseline, and then verifies there is no remaining
+schema drift. It is idempotent — running it on an already-adopted database just
+upgrades it to the latest revision.
+
+### Backup and recovery
+
+The whole database is the single SQLite file at `DB_URL`. To back it up, copy
+that file while the server is stopped (or use `sqlite3 meridian.db ".backup
+meridian.db.bak"` live). To recover, stop the server and copy the backup back.
+
+- **A migration failed partway:** SQLite runs migrations without transactional
+  DDL, so a failed `upgrade` can leave the schema half-applied. Restore the
+  pre-migration backup, fix the migration script, and re-run.
+- **A downgrade isn't available or is lossy:** restoring the backup is always the
+  safe fallback; `downgrade` is best-effort and column drops lose data.
 
 ## 5. Running the service
 
 ```bash
 cd backend
+python -m app.db_migrations upgrade      # if you haven't since pulling schema changes
 uvicorn app.main:app --reload --port 8000
 ```
 
-Or start both backend and frontend together from the repo root with `./run.sh`.
+Or start both backend and frontend together from the repo root with `./run.sh`
+(which runs the migration step for you). If the schema is behind, the server logs
+the exact command to run and exits instead of starting.
 
 - API root: `http://localhost:8000`
 - Interactive docs (Swagger UI): `http://localhost:8000/docs`
@@ -275,6 +341,9 @@ Key tables (`app/models.py`, SQLAlchemy 2.0):
 - **`JobBlockedQuestion`** — one unresolved required question for one specific job (not a reusable, workspace-wide answer bank), including any LLM-drafted suggestion and the human's approved answer.
 - **`Batch`** — a recurring or one-off discovery+apply schedule: search filters or an uploaded-file source, interval/repeat configuration, its own `auto_apply_threshold`, and status.
 - **`BatchRun`** — one execution's log: counts fetched/new/updated/auto-applied/needs-review, and any error.
+- **`Setting`** — legacy global key/value store, kept only so a pre-workspace database has something for `adopt` to read.
+
+Schema changes go through Alembic (`alembic/versions/`); see [§4](#4-setup).
 
 ## 10. Testing
 
@@ -283,7 +352,7 @@ cd backend
 pytest tests/ -v
 ```
 
-The suite (111 tests across 10 files) drives the auto-apply engine against **local static HTML fixtures** (`tests/fixtures/`, ~26 files reproducing real ATS DOM quirks — Ashby's malformed `label[for]` patterns, Greenhouse's react-select comboboxes, CAPTCHA variants, checkbox groups) rather than live job postings, so it never touches the network or risks a real submission. LLM-drafting tests mock `httpx.post`, so no local Ollama server is required to run the suite. Some tests use a real headless Chromium via shared fixtures in `conftest.py`, so Playwright's browser must be installed first:
+`tests/test_migrations.py` covers the Alembic setup on throwaway SQLite files: the baseline reproduces the live model schema with zero autogenerate drift, upgrade→downgrade is clean, and `adopt` onboards a pre-Alembic database (with real rows and a legacy `settings` entry) without losing data. The rest of the suite drives the auto-apply engine against **local static HTML fixtures** (`tests/fixtures/`, ~26 files reproducing real ATS DOM quirks — Ashby's malformed `label[for]` patterns, Greenhouse's react-select comboboxes, CAPTCHA variants, checkbox groups) rather than live job postings, so it never touches the network or risks a real submission. LLM-drafting tests mock `httpx.post`, so no local Ollama server is required to run the suite. Some tests use a real headless Chromium via shared fixtures in `conftest.py`, so Playwright's browser must be installed first:
 
 ```bash
 python -m playwright install chromium

@@ -1,0 +1,8 @@
+Alembic migration environment for Meridian.
+
+- Config: ../alembic.ini (database URL is intentionally blank there — env.py
+  resolves it from DB_URL via app.config, so there is one source of truth).
+- Don't call `alembic` for routine work; use the wrapper:
+      python -m app.db_migrations upgrade | current | check | downgrade | stamp | adopt
+- Full docs, including how to add a migration and how to adopt a pre-Alembic
+  database, are in ../README.md section 4 ("Database migrations").

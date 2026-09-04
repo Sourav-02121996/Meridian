@@ -1,7 +1,13 @@
-"""Lightweight in-app migration: this project has no Alembic, so on startup we
-create any new tables and, if an older single-workspace database is detected,
-fold its existing global resume/threshold/jobs into an auto-created "Default"
-workspace so nothing already saved is lost.
+"""Legacy one-shot catch-up for databases created before Alembic existed.
+
+This is no longer run on startup — Alembic (``backend/alembic/``) owns the schema
+now. It survives only as the first step of ``python -m app.db_migrations adopt``:
+for a pre-Alembic database it creates any missing tables, adds the columns that
+were bolted on incrementally over this project's early history, and folds an old
+single-workspace database's global resume/threshold/jobs into an auto-created
+"Default" workspace so nothing already saved is lost. ``adopt`` then stamps the
+result at the Alembic baseline. Do not add new migrations here — create an
+Alembic revision instead.
 """
 
 import logging
@@ -157,8 +163,10 @@ def run_migrations(engine: Engine) -> None:
             )
             log.info("Migrated %s legacy job(s) into workspace #%s (Default)", orphaned, default_id)
 
-        # Jobs used to be unique on a bare external_id; now that they're scoped per
-        # workspace, uniqueness has to be (workspace_id, external_id) instead.
+        # Jobs used to be *unique* on a bare external_id; now that they're scoped
+        # per workspace, uniqueness has to be (workspace_id, external_id) instead —
+        # but external_id on its own is still a plain (non-unique) lookup index on
+        # the current model, so drop the old unique one and recreate it unique-less.
         if had_external_id_index:
             conn.execute(text("DROP INDEX IF EXISTS ix_jobs_external_id"))
         conn.execute(
@@ -166,4 +174,7 @@ def run_migrations(engine: Engine) -> None:
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_job_workspace_external "
                 "ON jobs (workspace_id, external_id)"
             )
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_jobs_external_id ON jobs (external_id)")
         )
