@@ -161,6 +161,7 @@ python -m pip install -r backend/requirements.txt
 python -m playwright install chromium
 
 cp backend/.env.example backend/.env
+(cd backend && python -m app.db_migrations upgrade)   # create the database schema
 
 cd frontend && npm install && cd ..
 chmod +x run.sh
@@ -177,7 +178,7 @@ This starts the backend (`uvicorn app.main:app --reload --port 8000`) and the fr
 - App: `http://localhost:5173`
 - API + interactive docs: `http://localhost:8000/docs`
 
-The SQLite database is created automatically inside `backend/` on first run (no manual migration step). The first discovery run downloads the `all-mpnet-base-v2` embedding model (~400 MB); later runs reuse the local cache.
+`run.sh` applies any pending database migrations (`alembic upgrade head`, via `python -m app.db_migrations upgrade`) before starting the backend, so the SQLite database inside `backend/` is created and kept current automatically. If you have a database from before Alembic was added, run `cd backend && python -m app.db_migrations adopt` once — see [backend/README.md §4](backend/README.md#4-setup). The first discovery run downloads the `all-mpnet-base-v2` embedding model (~400 MB); later runs reuse the local cache.
 
 ## Using Meridian
 
@@ -199,7 +200,7 @@ Copy `backend/.env.example` to `backend/.env` and adjust as needed. The full var
 ## Testing
 
 ```bash
-# Backend — 111 tests, driven against local ATS HTML fixtures (no live network calls, nothing is ever really submitted)
+# Backend — auto-apply tests run against local ATS HTML fixtures (no live network calls, nothing is ever really submitted); migration tests run against throwaway SQLite files
 cd backend && pytest tests/ -v
 
 # Frontend — type-check and production build

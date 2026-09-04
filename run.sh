@@ -15,6 +15,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+(cd backend && "$PYTHON" -m app.db_migrations upgrade) || {
+  echo "Meridian: database migration failed — see above. Backend not started."
+  exit 1
+}
+
 (cd backend && "$PYTHON" -m uvicorn app.main:app --reload --port 8000) &
 BACKEND_PID=$!
 (cd frontend && npm run dev -- --host 0.0.0.0) &

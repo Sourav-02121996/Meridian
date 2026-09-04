@@ -7,14 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import scheduler
 from .config import get_settings
 from .db import engine
-from .migrations import run_migrations
+from .db_migrations import MigrationsPending, check_current
 from .routes import batches, dashboard, jobs, scrape, settings, stats, workspaces
 
 logging.basicConfig(
     level=getattr(logging, get_settings().log_level.upper(), logging.INFO),
     format="%(asctime)s | Meridian | %(levelname)s | %(message)s",
 )
-run_migrations(engine)
+
+try:
+    check_current(engine)
+except MigrationsPending as exc:
+    raise SystemExit(f"\nMeridian cannot start: {exc}\n") from exc
 
 
 @asynccontextmanager
