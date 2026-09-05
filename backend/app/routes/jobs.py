@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import asc, delete, desc, or_, select
+from sqlalchemy import asc, delete, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -14,6 +14,7 @@ from ..schemas import (
     JobBlockedQuestionOut,
     JobOut,
     JobPatch,
+    JobsPage,
     SortField,
     SortOrder,
 )
@@ -50,7 +51,7 @@ def filtered_jobs_stmt(
     return stmt
 
 
-@router.get("", response_model=list[JobOut])
+@router.get("", response_model=JobsPage)
 def list_jobs(
     workspace_id: int,
     status: JobStatus | None = None,
@@ -60,12 +61,19 @@ def list_jobs(
     q: str = "",
     auto_apply_state: str | None = None,
     batch_id: int | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    stmt = filtered_jobs_stmt(workspace_id, status, min_score, q, auto_apply_state, batch_id)
+    base_stmt = filtered_jobs_stmt(workspace_id, status, min_score, q, auto_apply_state, batch_id)
+    total = db.scalar(select(func.count()).select_from(base_stmt.subquery()))
     column = Job.score if sort == "score" else Job.date_fetched
-    stmt = stmt.order_by((desc if order == "desc" else asc)(column))
-    return list(db.scalars(stmt).all())
+    # Job.id is a fixed tiebreaker (independent of `order`) so rows with a tied
+    # score/date_fetched get a stable order across pages — without it, LIMIT/OFFSET
+    # pagination can skip or duplicate rows whenever the primary sort column ties.
+    items_stmt = base_stmt.order_by((desc if order == "desc" else asc)(column), Job.id.asc())
+    items = list(db.scalars(items_stmt.limit(page_size).offset((page - 1) * page_size)).all())
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.get("/export")
