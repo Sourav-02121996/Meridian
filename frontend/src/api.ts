@@ -30,6 +30,13 @@ export interface Job {
   updated_at: string;
 }
 
+export interface JobsPage {
+  items: Job[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface Workspace {
   id: number;
   name: string;
@@ -292,7 +299,7 @@ export const api = {
     }),
 
   jobs: (workspaceId: number, params: URLSearchParams) =>
-    request<Job[]>(`/api/workspaces/${workspaceId}/jobs?${params}`),
+    request<JobsPage>(`/api/workspaces/${workspaceId}/jobs?${params}`),
   job: (workspaceId: number, id: number) =>
     request<Job>(`/api/workspaces/${workspaceId}/jobs/${id}`),
   stats: (workspaceId: number) => request<Stats>(`/api/workspaces/${workspaceId}/stats`),

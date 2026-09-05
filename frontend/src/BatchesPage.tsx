@@ -123,6 +123,11 @@ function BatchCard({ batch }: { batch: Batch }) {
         batch.workspace_id,
         new URLSearchParams({
           auto_apply_state: 'needs_review',
+          // This mini-list has no page controls of its own, so pull the largest
+          // allowed page in one shot — jobs leave needs_review once acted on, so
+          // 100 is a practical ceiling, but a batch with more than that pending
+          // would now be capped rather than shown in full as it used to be.
+          page_size: '100',
           ...(batch.source === 'upload' ? { batch_id: String(batch.id) } : {}),
         }),
       ),
@@ -250,9 +255,9 @@ function BatchCard({ batch }: { batch: Batch }) {
             <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-fg/65">
               Needs your review
             </h4>
-            {reviewQ.data?.length ? (
+            {reviewQ.data?.items.length ? (
               <div className="space-y-2">
-                {reviewQ.data.map((job) => (
+                {reviewQ.data.items.map((job) => (
                   <ReviewRow key={job.id} job={job} workspaceId={batch.workspace_id} />
                 ))}
               </div>

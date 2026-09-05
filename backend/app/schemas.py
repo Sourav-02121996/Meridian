@@ -36,6 +36,13 @@ class JobOut(BaseModel):
     updated_at: datetime
 
 
+class JobsPage(BaseModel):
+    items: list[JobOut]
+    total: int
+    page: int
+    page_size: int
+
+
 class JobPatch(BaseModel):
     status: JobStatus
 

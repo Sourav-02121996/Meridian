@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   BarChart3,
@@ -18,6 +18,8 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
+import { Pagination } from './Pagination';
+import { useDebouncedValue } from './hooks/useDebouncedValue';
 import {
   Bar,
   BarChart,
@@ -92,7 +94,10 @@ function WorkspaceView({
     [minScore, setMinScore] = useState(''),
     [search, setSearch] = useState(''),
     [sort, setSort] = useState('score'),
-    [order, setOrder] = useState('desc');
+    [order, setOrder] = useState('desc'),
+    [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(20);
+  const debouncedSearch = useDebouncedValue(search, 300);
   useEffect(() => {
     if (settingsQ.data) {
       setResume(settingsQ.data.resume);
@@ -100,17 +105,24 @@ function WorkspaceView({
       setAutoApplyThreshold(settingsQ.data.auto_apply_threshold);
     }
   }, [settingsQ.data]);
-  const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (minScore) params.set('min_score', minScore);
-  if (search) params.set('q', search);
-  params.set('sort', sort);
-  params.set('order', order);
+  const filterParams = new URLSearchParams();
+  if (status) filterParams.set('status', status);
+  if (minScore) filterParams.set('min_score', minScore);
+  if (debouncedSearch) filterParams.set('q', debouncedSearch);
+  filterParams.set('sort', sort);
+  filterParams.set('order', order);
+  const listParams = new URLSearchParams(filterParams);
+  listParams.set('page', String(page));
+  listParams.set('page_size', String(pageSize));
   const jobsQ = useQuery({
-    queryKey: ['jobs', workspaceId, params.toString()],
-    queryFn: () => api.jobs(workspaceId, params),
+    queryKey: ['jobs', workspaceId, listParams.toString()],
+    queryFn: () => api.jobs(workspaceId, listParams),
+    placeholderData: keepPreviousData,
+    // Only the current page's jobs are checked here, so a job `applying` on a
+    // different page won't trigger polling while viewing this one — an accepted
+    // trade-off of paginating a list that used to be fetched in full.
     refetchInterval: (query) =>
-      query.state.data?.some((job) => job.auto_apply_state === 'applying') ? 1000 : false,
+      query.state.data?.items?.some((job) => job.auto_apply_state === 'applying') ? 1000 : false,
   });
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['jobs', workspaceId] });
@@ -185,9 +197,9 @@ function WorkspaceView({
             </div>
             <div className="flex items-center gap-3">
               <span className="mono-num text-sm font-medium text-fg/65">
-                {jobsQ.data?.length ?? 0} jobs
+                {jobsQ.data?.total ?? 0} jobs
               </span>
-              <ExportButton workspaceId={workspaceId} params={params} />
+              <ExportButton workspaceId={workspaceId} params={filterParams} />
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -197,10 +209,20 @@ function WorkspaceView({
                 className="min-w-0 flex-1 outline-none"
                 placeholder="Search roles or companies"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
               />
             </label>
-            <select className="field" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select
+              className="field"
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPage(1);
+              }}
+            >
               <option value="">All statuses</option>
               {Object.entries(statusLabels).map(([v, l]) => (
                 <option value={v} key={v}>
@@ -215,7 +237,10 @@ function WorkspaceView({
               max="100"
               placeholder="Minimum score"
               value={minScore}
-              onChange={(e) => setMinScore(e.target.value)}
+              onChange={(e) => {
+                setMinScore(e.target.value);
+                setPage(1);
+              }}
             />
             <select
               className="field"
@@ -224,6 +249,7 @@ function WorkspaceView({
                 const [s, o] = e.target.value.split('-');
                 setSort(s);
                 setOrder(o);
+                setPage(1);
               }}
             >
               <option value="score-desc">Highest score</option>
@@ -239,14 +265,32 @@ function WorkspaceView({
         {jobsQ.isLoading ? (
           <div className="p-12 text-center text-fg/65">Loading your pipeline…</div>
         ) : jobsQ.isError ? (
-          <ErrorBox error={jobsQ.error} />
-        ) : jobsQ.data?.length ? (
-          <JobTable
-            jobs={jobsQ.data}
-            threshold={threshold}
-            workspaceId={workspaceId}
-            onChanged={refresh}
-          />
+          <ErrorBox error={jobsQ.error} onRetry={() => jobsQ.refetch()} />
+        ) : jobsQ.data?.items.length ? (
+          <>
+            <JobTable
+              jobs={jobsQ.data.items}
+              threshold={threshold}
+              workspaceId={workspaceId}
+              onChanged={refresh}
+            />
+            <Pagination
+              total={jobsQ.data.total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          </>
+        ) : status || minScore || search ? (
+          <div className="p-16 text-center">
+            <BriefcaseBusiness className="mx-auto mb-3 text-fg/65" size={40} />
+            <p className="font-display font-bold">No jobs match these filters</p>
+            <p className="mt-1 text-sm text-fg/65">Try adjusting or clearing your filters.</p>
+          </div>
         ) : (
           <div className="p-16 text-center">
             <BriefcaseBusiness className="mx-auto mb-3 text-fg/65" size={40} />
@@ -1291,7 +1335,16 @@ function JobRow({
     </article>
   );
 }
-function ErrorBox({ error }: { error: Error }) {
-  return <div className="m-5 rounded-xl bg-danger/10 p-4 text-sm text-danger">{error.message}</div>;
+function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => void }) {
+  return (
+    <div className="m-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-danger/10 p-4 text-sm text-danger">
+      <span>{error.message}</span>
+      {onRetry && (
+        <button type="button" className="btn btn-outline" onClick={onRetry}>
+          Retry
+        </button>
+      )}
+    </div>
+  );
 }
 export default WorkspaceView;
