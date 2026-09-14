@@ -30,6 +30,7 @@ from .fields import (
     count_genuinely_invalid,
     fill_known_fields,
     find_unhandled_required_fields,
+    genuinely_invalid_field_labels,
     track,
 )
 from .platforms import (
@@ -688,6 +689,16 @@ def fill_and_submit(
     invalid_count = count_genuinely_invalid(page)
     retry_round = 0
     while invalid_count > 0 and retry_round < _MAX_FINAL_VALIDATION_ROUNDS:
+        # The whole Tier-A pass, not just resolved_fields below: the same
+        # cascading revert described above also hits Tier-A's own fields,
+        # which resolved_fields never covered. Safe to repeat — an
+        # already-correct field is detected and skipped rather than refilled.
+        fill_known_fields(
+            page,
+            profile,
+            extra_text_labels=config.extra_text_labels,
+            after_field_fill=settle_field_save,
+        )
         for field, value in resolved_fields:
             if _fill_answer(page, field, value) and settle_field_save is not None:
                 settle_field_save()
@@ -702,6 +713,9 @@ def fill_and_submit(
             config.name,
             invalid_count,
             retry_round,
+        )
+        log.debug(
+            "Still-invalid field(s) for %s: %s", apply_url, genuinely_invalid_field_labels(page)
         )
         return _give_up(apply_url, config.name, "fields_invalid_before_submit")
 

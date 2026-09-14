@@ -52,7 +52,11 @@ export interface WorkspaceSettings {
   profile_linkedin: string;
   profile_portfolio_url: string;
   profile_github_url: string;
+  profile_address: string;
+  profile_address2: string;
+  profile_zip: string;
   profile_city: string;
+  profile_county: string;
   profile_state: string;
   profile_country: string;
   profile_location: string;
@@ -83,7 +87,11 @@ export interface Profile {
   linkedin: string;
   portfolio_url: string;
   github_url: string;
+  address: string;
+  address2: string;
+  zip: string;
   city: string;
+  county: string;
   state: string;
   country: string;
   current_company: string;

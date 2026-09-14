@@ -70,7 +70,11 @@ class ProfileRequest(BaseModel):
     linkedin: str = ""
     portfolio_url: str = ""
     github_url: str = ""
+    address: str = ""
+    address2: str = ""
+    zip: str = ""
     city: str = ""
+    county: str = ""
     state: str = ""
     country: str = ""
     current_company: str = ""
@@ -127,7 +131,11 @@ class WorkspaceSettingsOut(BaseModel):
     profile_linkedin: str
     profile_portfolio_url: str
     profile_github_url: str
+    profile_address: str
+    profile_address2: str
+    profile_zip: str
     profile_city: str
+    profile_county: str
     profile_state: str
     profile_country: str
     profile_location: str
