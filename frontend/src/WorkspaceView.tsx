@@ -407,7 +407,11 @@ function ProfilePanel({
     linkedin: '',
     portfolio_url: '',
     github_url: '',
+    address: '',
+    address2: '',
+    zip: '',
     city: '',
+    county: '',
     state: '',
     country: '',
     current_company: '',
@@ -442,7 +446,11 @@ function ProfilePanel({
         linkedin: settings.profile_linkedin,
         portfolio_url: settings.profile_portfolio_url,
         github_url: settings.profile_github_url,
+        address: settings.profile_address,
+        address2: settings.profile_address2,
+        zip: settings.profile_zip,
         city: settings.profile_city,
+        county: settings.profile_county,
         state: settings.profile_state,
         country: settings.profile_country,
         current_company: settings.profile_current_company,
@@ -502,11 +510,26 @@ function ProfilePanel({
       </div>
 
       <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">Location</p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <TextField label="Address" value={profile.address} onChange={set('address')} />
+        <TextField
+          label="Address line 2 (apt / flat no.)"
+          value={profile.address2}
+          onChange={set('address2')}
+        />
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-5">
         <TextField label="City" value={profile.city} onChange={set('city')} />
-        <TextField label="State / region" value={profile.state} onChange={set('state')} />
+        <TextField label="County (if asked)" value={profile.county} onChange={set('county')} />
+        <TextField label="State" value={profile.state} onChange={set('state')} />
+        <TextField label="Zip / postal code" value={profile.zip} onChange={set('zip')} />
         <TextField label="Country" value={profile.country} onChange={set('country')} />
       </div>
+      <p className="mt-2 text-xs text-fg/50">
+        State accepts either a full name or its two-letter code (e.g. Ohio or OH). Address is filled
+        by selecting the matching suggestion if the employer's form opens a dropdown while typing,
+        and typed directly otherwise.
+      </p>
 
       <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-fg/40">
         Work details

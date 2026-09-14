@@ -29,13 +29,40 @@ import numpy as np
 
 from ..config import get_settings
 from ..embeddings import embed_text, embed_texts
-from .fields import EEO_LABELS, TEXT_LABELS, YES_NO_LABELS
+from .fields import (
+    ADDRESS_LABELS,
+    ADDRESS2_LABELS,
+    CITY_LABELS,
+    COUNTRY_LABELS,
+    COUNTY_LABELS,
+    EEO_LABELS,
+    STATE_LABELS,
+    TEXT_LABELS,
+    YES_NO_LABELS,
+    ZIP_LABELS,
+)
 from .types import AnswerAttempt, QuestionDescriptor
 
 # Every profile key eligible for this tier, each mapped to the same alias phrasings
 # Tier A already searches for exactly — reused rather than duplicated so widening an
 # alias list in fields.py automatically widens what this tier can fuzzy-match too.
-_PROFILE_ALIASES: dict[str, list[str]] = {**TEXT_LABELS, **YES_NO_LABELS, **EEO_LABELS}
+# The whole address family is folded in explicitly since Tier A now fills it
+# through dedicated, more-accurate routines (fill_address, fill_exact_choice,
+# fill_typed) instead of the generic TEXT_LABELS table, but a custom question
+# phrased differently enough to miss Tier A's exact alias match should still be
+# able to fuzzy-match to the same value here.
+_PROFILE_ALIASES: dict[str, list[str]] = {
+    **TEXT_LABELS,
+    **YES_NO_LABELS,
+    **EEO_LABELS,
+    "address": ADDRESS_LABELS,
+    "address2": ADDRESS2_LABELS,
+    "zip": ZIP_LABELS,
+    "city": CITY_LABELS,
+    "county": COUNTY_LABELS,
+    "state": STATE_LABELS,
+    "country": COUNTRY_LABELS,
+}
 
 
 class _Corpus:

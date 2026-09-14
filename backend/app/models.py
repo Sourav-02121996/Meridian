@@ -77,7 +77,20 @@ class Workspace(Base):
     # settings.py::save_profile), never written to directly by a request — kept
     # around because most ATS forms have one freeform "Location" field, not three
     # separate ones, so fields.py's TEXT_LABELS["location"] still needs one string.
+    # Street address, separate from city/state/country/zip: an ATS form's "Address"
+    # field can trigger a live suggestion dropdown (apply_adapters/fields.py::
+    # fill_address), which city/state/country/zip never do — they're always filled
+    # as plain fields. Also read by scheduler.py::_build_profile — adding a field
+    # here alone is not enough for it to ever reach a real application.
+    profile_address: Mapped[str] = mapped_column(String(300), default="")
+    profile_address2: Mapped[str] = mapped_column(String(300), default="")
+    profile_zip: Mapped[str] = mapped_column(String(20), default="")
     profile_city: Mapped[str] = mapped_column(String(100), default="")
+    # Some US ATS forms (confirmed on Paylocity) split County out as its own
+    # required field alongside city/state/zip. A plain field like city — no
+    # dropdown/exact-match complexity, since there's no abbreviation ambiguity
+    # or suggestion widget behavior confirmed for it the way state/address have.
+    profile_county: Mapped[str] = mapped_column(String(100), default="")
     profile_state: Mapped[str] = mapped_column(String(100), default="")
     profile_country: Mapped[str] = mapped_column(String(100), default="")
     profile_location: Mapped[str] = mapped_column(String(200), default="")

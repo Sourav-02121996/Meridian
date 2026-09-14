@@ -13,11 +13,14 @@ not a fuzzy keyword guess — so the "did we leave a required field unanswered" 
 at the end is a precise match against what we actually touched, not a heuristic.
 """
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Callable, Literal
 
 from .types import QuestionDescriptor
+
+log = logging.getLogger("meridian.apply_adapters")
 
 
 def _by_id(page, id_value: str):
@@ -51,16 +54,26 @@ def _radios_by_name(page, name_value: str):
 # across companies).
 TEXT_LABELS = {
     "email": ["Email"],
-    "phone": ["Phone"],
+    "phone": ["Phone", "Mobile Number", "Mobile Phone", "Cell Phone", "Telephone"],
     "linkedin": ["LinkedIn Profile", "LinkedIn URL", "LinkedIn"],
     "portfolio_url": ["Website", "Portfolio", "Personal Website", "Portfolio URL"],
     "github_url": ["GitHub"],
     "location": ["Location", "Current Location"],
-    "country": ["Country"],
+    # The address family is deliberately absent: each part needs handling this
+    # generic table can't give it — a suggestion dropdown to select from
+    # (address), exact rather than substring option matching (state/country,
+    # since "CA" is a substring of "North Carolina"), or real keystrokes rather
+    # than .fill() (address2/zip/city/county). See ADDRESS_LABELS and friends
+    # below, with fill_address / fill_exact_choice / fill_typed.
     "current_company": ["Current Company", "Current Employer"],
     "current_title": ["Current Title", "Current Job Title"],
     "desired_salary": ["Desired Salary", "Salary Expectation", "Compensation Expectation"],
-    "start_date": ["Earliest Start Date", "Available Start Date", "Start Date"],
+    "start_date": [
+        "Earliest Start Date",
+        "Available Start Date",
+        "Start Date",
+        "Available to Start",
+    ],
     "citizenship": ["Citizenship", "Country of Citizenship"],
     "security_clearance": ["Security Clearance", "Clearance Level", "Active Security Clearance"],
 }
@@ -92,6 +105,81 @@ def canonicalize_country(value: str) -> str:
     fuzzy-matched or guessed, since a wrong country is a factual claim, not a
     stylistic one."""
     return _COUNTRY_ALIASES.get(value.strip().lower(), value)
+
+
+# Reverse of _COUNTRY_ALIASES: canonical full name -> every alias that maps to it.
+# Used by _country_name_variants so an address-suggestion widget's own preferred
+# style (Google Places suffixes US addresses with "USA", not "United States") is
+# still recognized as a match against a profile that stores the canonical form.
+_COUNTRY_ALIAS_REVERSE: dict[str, list[str]] = {}
+for _alias, _full in _COUNTRY_ALIASES.items():
+    _COUNTRY_ALIAS_REVERSE.setdefault(_full.lower(), []).append(_alias)
+
+
+def _country_name_variants(value: str) -> list[str]:
+    """Every plausible way this country could appear in a suggestion or be
+    typed into a field, canonical form first — it's the most correct value to
+    submit, so it must be candidates[0] rather than whichever alias an
+    unordered set happened to yield. Deduplicated, order preserved."""
+    if not value:
+        return []
+    canonical = canonicalize_country(value)
+    ordered = [canonical, value, *_COUNTRY_ALIAS_REVERSE.get(canonical.lower(), [])]
+    seen: set[str] = set()
+    variants = []
+    for variant in ordered:
+        if variant and variant.lower() not in seen:
+            seen.add(variant.lower())
+            variants.append(variant)
+    return variants
+
+
+# Most-specific first, bare "Address" last: get_by_label matches substrings, so
+# the generic "Address" alias also matches "Address Line 2" and can resolve to
+# the wrong field on a form with both. A specific phrasing matching first never
+# reaches it, since the caller returns as soon as an alias succeeds.
+ADDRESS_LABELS = ["Street Address", "Address Line 1", "Home Address", "Address"]
+COUNTRY_LABELS = ["Country"]
+STATE_LABELS = ["State", "State/Province", "Province"]
+ADDRESS2_LABELS = ["Address Line 2", "Apartment", "Apt/Suite", "Suite", "Unit", "Flat"]
+ZIP_LABELS = ["Zip", "Zip Code", "Postal Code", "ZIP/Postal Code", "Pin Code", "PIN"]
+CITY_LABELS = ["City"]
+COUNTY_LABELS = ["County"]
+
+# Full name <-> two-letter code, both directions, for US states/DC/Puerto Rico. An
+# ATS's State field can offer either style as its real options ("California" or
+# "CA") and there's no way to know which without asking the live page, so both
+# forms are tried — see _state_name_variants and fill_exact_choice.
+_US_STATES = {
+    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
+    "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware", "FL": "Florida", "GA": "Georgia",
+    "HI": "Hawaii", "ID": "Idaho", "IL": "Illinois", "IN": "Indiana", "IA": "Iowa",
+    "KS": "Kansas", "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+    "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi",
+    "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
+    "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+    "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma",
+    "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
+    "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah", "VT": "Vermont",
+    "VA": "Virginia", "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin",
+    "WY": "Wyoming", "DC": "District of Columbia", "PR": "Puerto Rico",
+}  # fmt: skip
+_US_STATE_ABBR_TO_FULL = {abbr.lower(): full for abbr, full in _US_STATES.items()}
+_US_STATE_FULL_TO_ABBR = {full.lower(): abbr for abbr, full in _US_STATES.items()}
+
+
+def _state_name_variants(value: str) -> list[str]:
+    """Both plausible forms for a state value, as-typed first: if the profile
+    stored an abbreviation, also try its full name (and vice versa). Anything
+    not recognized as either form of a US state is returned as a single
+    candidate, unchanged — never guessed."""
+    stripped = value.strip()
+    lowered = stripped.lower()
+    if lowered in _US_STATE_ABBR_TO_FULL:
+        return [stripped, _US_STATE_ABBR_TO_FULL[lowered]]
+    if lowered in _US_STATE_FULL_TO_ABBR:
+        return [stripped, _US_STATE_FULL_TO_ABBR[lowered]]
+    return [stripped]
 
 
 # Yes/No eligibility questions. Label text is matched loosely against however the
@@ -292,10 +380,17 @@ def _click_yesno_toggle(yes_button, no_button, value: str) -> bool:
 def _label_by_own_text(page, label_text: str):
     """The single `<label>` whose own text matches `label_text`, or None if there
     isn't exactly one — refusing rather than guessing which of several is the real
-    question, same as everywhere else in this file that resolves by text."""
+    question, same as everywhere else in this file that resolves by text. Matches
+    `label_text` as a whole word, not a bare substring: a plain substring filter
+    let a combobox's own folded-in selected value ("Country" whose label reads
+    "Country\nUnited States") match a completely different field's search term
+    ("State", found inside "States") — confirmed live, and this filter's own
+    word-boundary requirement can only ever narrow its candidate set, never
+    admit a new false positive, so it's strictly safer for every existing case
+    too (e.g. "Location" no longer coincidentally matches inside "relocation")."""
     try:
         candidates = page.locator("label").filter(
-            has_text=re.compile(re.escape(label_text), re.IGNORECASE)
+            has_text=re.compile(rf"\b{re.escape(label_text)}\b", re.IGNORECASE)
         )
         # "Location" also occurs inside Harvey's longer relocation question and
         # several radio options. Substring matching therefore returns many labels
@@ -390,6 +485,25 @@ def track(filled_ids: set[str], locator) -> None:
         pass
 
 
+_COOKIE_CONSENT_ACCEPT_SELECTOR = "#onetrust-accept-btn-handler"
+
+
+def _dismiss_cookie_consent_banner(page) -> None:
+    """Dismisses a OneTrust cookie-consent banner, which renders over the form
+    and physically blocks clicks on the fields underneath (confirmed live on
+    Paylocity). Best-effort and called once before any field interaction; most
+    ATS never render one, so a missing banner is a normal no-op.
+    """
+    try:
+        accept = page.locator(_COOKIE_CONSENT_ACCEPT_SELECTOR)
+        if accept.count() > 0 and accept.first.is_visible():
+            accept.first.click(timeout=3000)
+            page.wait_for_timeout(300)
+            log.debug("Dismissed a OneTrust cookie-consent banner")
+    except Exception:
+        log.debug("Cookie-consent banner dismiss attempt failed", exc_info=True)
+
+
 def fill_known_fields(
     page,
     profile: dict,
@@ -403,6 +517,7 @@ def fill_known_fields(
     the GraphQL save caused by one interaction before changing the next field;
     without that barrier, overlapping responses can restore a stale form state.
     """
+    _dismiss_cookie_consent_banner(page)
     filled_ids: set[str] = set()
 
     def fill_then_settle(action: Callable[[], bool]) -> bool:
@@ -432,6 +547,64 @@ def fill_known_fields(
         if last:
             fill_then_settle(lambda: fill_text(page, filled_ids, ["Preferred Last Name"], last))
 
+    address = (profile.get("address") or "").strip()
+    if address:
+        log.debug("Address: profile has %r, attempting fill", address)
+        address_labels = ADDRESS_LABELS + list((extra_text_labels or {}).get("address", []))
+        fill_then_settle(
+            lambda: fill_address(
+                page,
+                filled_ids,
+                address_labels,
+                address,
+                expected_city=(profile.get("city") or "").strip(),
+                expected_state=(profile.get("state") or "").strip(),
+                expected_country=(profile.get("country") or "").strip(),
+                expected_zip=(profile.get("zip") or "").strip(),
+            )
+        )
+    else:
+        # Logged rather than silently skipped: a blank value produces no
+        # fill_address output at all downstream, which is otherwise
+        # indistinguishable from it running and failing.
+        log.debug("Address: profile field is blank, skipping")
+
+    state = (profile.get("state") or "").strip()
+    if state:
+        log.debug("State: profile has %r, attempting fill", state)
+        state_labels = STATE_LABELS + list((extra_text_labels or {}).get("state", []))
+        fill_then_settle(
+            lambda: fill_exact_choice(page, filled_ids, state_labels, _state_name_variants(state))
+        )
+    else:
+        log.debug("State: profile field is blank, skipping")
+
+    country = (profile.get("country") or "").strip()
+    if country:
+        log.debug("Country: profile has %r, attempting fill", country)
+        country_labels = COUNTRY_LABELS + list((extra_text_labels or {}).get("country", []))
+        fill_then_settle(
+            lambda: fill_exact_choice(
+                page, filled_ids, country_labels, _country_name_variants(country)
+            )
+        )
+    else:
+        log.debug("Country: profile field is blank, skipping")
+
+    for key, default_labels in (
+        ("address2", ADDRESS2_LABELS),
+        ("zip", ZIP_LABELS),
+        ("city", CITY_LABELS),
+        ("county", COUNTY_LABELS),
+    ):
+        value = (profile.get(key) or "").strip()
+        if value:
+            log.debug("%s: profile has %r, attempting fill", key, value)
+            labels = default_labels + list((extra_text_labels or {}).get(key, []))
+            fill_then_settle(lambda: fill_typed(page, filled_ids, labels, value))
+        else:
+            log.debug("%s: profile field is blank, skipping", key)
+
     text_labels = {key: list(labels) for key, labels in TEXT_LABELS.items()}
     for key, labels in (extra_text_labels or {}).items():
         # Platform-specific aliases are tried in addition to (not instead of) the
@@ -445,7 +618,10 @@ def fill_known_fields(
             # control.  fill_text inspects the live combobox shape itself, so the
             # same full profile location can select Greenhouse's City option or
             # fill Ashby's id-less autocomplete correctly.
+            log.debug("%s: profile has %r, attempting fill", key, value)
             fill_then_settle(lambda: fill_text(page, filled_ids, labels, value))
+        else:
+            log.debug("%s: profile field is blank, skipping", key)
 
     for key, labels in YES_NO_LABELS.items():
         value = (profile.get(key) or "").strip()
@@ -475,14 +651,117 @@ def _label_plausibly_matches(page, el, searched_label: str) -> bool:
     label is drastically longer than the alias we searched for, this is almost
     certainly a coincidental substring match inside unrelated prose, not the
     field we meant. Fails open (returns True) if the label can't be read at all,
-    since that's not this specific, confirmed failure mode."""
+    since that's not this specific, confirmed failure mode.
+
+    Also confirmed live, a shorter-range version of the same failure: a
+    combobox can fold its own currently-selected value into its accessible
+    name (Paylocity's Country field reads as "Country\nUnited States"), and
+    that value can coincidentally contain a *different* field's search term as
+    a bare substring ("United States" contains "State") -- well within the
+    length budget above, so it isn't caught by that check alone. Requiring the
+    searched term to appear as a whole word (not merely a substring) catches
+    this without narrowing the length check's own existing tolerance."""
     try:
         real_label = _accessible_label(page, el)
     except Exception:
         return True
     if not real_label:
         return True
-    return len(real_label) <= len(searched_label) + 40
+    if len(real_label) > len(searched_label) + 40:
+        return False
+    return bool(re.search(rf"\b{re.escape(searched_label)}\b", real_label, re.IGNORECASE))
+
+
+def _locate_field_for_label(page, label: str):
+    """Resolves one label alias to a concrete element, or None if it doesn't
+    resolve to anything usable. Shared by fill_text and fill_exact_choice —
+    factored out of what was fill_text's own inline lookup, behavior unchanged."""
+    field = page.get_by_label(label, exact=False)
+    if field.count() == 0:
+        # get_by_label() relies on `for`/id (or aria-label/-labelledby)
+        # resolving to a real element — confirmed broken on this exact
+        # label text on Ashby (see _control_for_broken_label's module
+        # comment above). Only reached when the normal route already
+        # found nothing, never instead of it.
+        return _control_for_broken_label(page, label) or _control_by_id_or_name(page, label)
+    el = field.first
+    # Confirmed live: acting through a `get_by_label(...).first` locator
+    # that matched more than one element on the page (e.g. "Location"
+    # substring-matching both the real location field and an unrelated
+    # "...relocation..." question) behaves differently from acting through
+    # a plain single-match #id locator, even once .first has resolved to
+    # the right element — a .fill()/.type() through the ambiguous locator
+    # silently didn't stick, through the re-bound one it did. Re-binding to
+    # id/name once resolved removes that ambiguity for every action after.
+    if field.count() > 1:
+        identity = el.get_attribute("id")
+        if identity:
+            el = _by_id(page, identity)
+    if not _label_plausibly_matches(page, el, label):
+        # A broad accessible-label match can land on an unrelated
+        # option such as "...willing to relocate" while Ashby's real
+        # standalone Location label remains dangling and therefore
+        # invisible to get_by_label. Fall back to the exact own-text
+        # structural lookup here too, not only when count()==0.
+        return _control_for_broken_label(page, label) or _control_by_id_or_name(page, label)
+    return el
+
+
+def _control_by_id_or_name(page, label_text: str):
+    """Last-resort lookup by the control's own id/name, for a field with no
+    resolvable accessible label at all — confirmed live on Paylocity, whose
+    State field is a visible input with no name, no role and nothing
+    get_by_label can resolve, but an id that names the field plainly.
+
+    Matched as a whole token inside the id/name ("State" matches
+    "public-site-address-us-state" but not "realestate"), and only an
+    unambiguous single match is accepted."""
+    token = re.sub(r"[^a-z0-9]+", "", label_text.lower())
+    if len(token) < 3:
+        return None  # too short to be a meaningful, non-coincidental match
+    try:
+        found = page.evaluate(
+            """(token) => {
+                const sep = '[^a-z0-9]';
+                const re = new RegExp('(^|' + sep + ')' + token + '($|' + sep + ')', 'i');
+                const els = Array.from(document.querySelectorAll(
+                    'input:not([type=hidden]):not([type=submit]):not([type=button]),'
+                    + 'select, textarea'
+                )).filter((el) => (
+                    (el.offsetParent || el.getClientRects().length)
+                    && (re.test(el.id || '') || re.test(el.getAttribute('name') || ''))
+                ));
+                return els.length === 1 ? (els[0].id || null) : null;
+            }""",
+            token,
+        )
+    except Exception:
+        return None
+    if not found:
+        return None
+    log.debug("Located field for %r by id/name instead of label: %r", label_text, found)
+    return _by_id(page, found)
+
+
+def _type_verified(el, value: str, retries: int = 2) -> bool:
+    """Types `value` via real keystrokes, verifying the input actually holds
+    it afterwards and retrying (clear + retype, slower) if not. A fast
+    per-keystroke type can silently drop a character on a page doing heavy
+    per-keystroke work — "765 Montague Expy" landing as "765 ontague Expy" —
+    and nothing downstream reliably catches that, since a slightly wrong query
+    can still return suggestions.
+    """
+    for attempt in range(retries + 1):
+        # Short timeout rather than Playwright's 30s default: a click that
+        # can't land is almost always blocked by something overlapping the
+        # field (a selected-value display, a consent banner), which retrying
+        # never clears. Failing fast lets the caller try its next option.
+        el.click(timeout=_BLOCKED_CLICK_TIMEOUT_MS)
+        el.fill("")
+        el.type(value, delay=20 if attempt == 0 else 60)
+        if (el.input_value() or "").strip() == value.strip():
+            return True
+    return False
 
 
 def fill_text(page, filled_ids: set[str], labels: list[str], value: str) -> bool:
@@ -495,44 +774,17 @@ def fill_text(page, filled_ids: set[str], labels: list[str], value: str) -> bool
     can be a constrained choice while another's is freeform."""
     for label in labels:
         try:
-            field = page.get_by_label(label, exact=False)
-            if field.count() == 0:
-                # get_by_label() relies on `for`/id (or aria-label/-labelledby)
-                # resolving to a real element — confirmed broken on this exact
-                # label text on Ashby (see _control_for_broken_label's module
-                # comment above). Only reached when the normal route already
-                # found nothing, never instead of it.
-                el = _control_for_broken_label(page, label)
-                if el is None:
-                    continue
-            else:
-                el = field.first
-                # Confirmed live: acting through a `get_by_label(...).first` locator
-                # that matched more than one element on the page (e.g. "Location"
-                # substring-matching both the real location field and an unrelated
-                # "...relocation..." question) behaves differently from acting through
-                # a plain single-match #id locator, even once .first has resolved to
-                # the right element — a .fill()/.type() through the ambiguous locator
-                # silently didn't stick, through the re-bound one it did. Re-binding to
-                # id/name once resolved removes that ambiguity for every action after.
-                if field.count() > 1:
-                    identity = el.get_attribute("id")
-                    if identity:
-                        el = _by_id(page, identity)
-                if not _label_plausibly_matches(page, el, label):
-                    # A broad accessible-label match can land on an unrelated
-                    # option such as "...willing to relocate" while Ashby's real
-                    # standalone Location label remains dangling and therefore
-                    # invisible to get_by_label. Fall back to the exact own-text
-                    # structural lookup here too, not only when count()==0.
-                    el = _control_for_broken_label(page, label)
-                    if el is None:
-                        continue
+            el = _locate_field_for_label(page, label)
+            if el is None:
+                continue
             tag = el.evaluate("e => e.tagName.toLowerCase()")
             is_combobox = tag == "input" and (el.get_attribute("role") or "") == "combobox"
             if tag == "select":
                 el.select_option(label=re.compile(re.escape(value), re.IGNORECASE))
                 track(filled_ids, el)
+                log.debug(
+                    "Fill-text: label %r is a <select>, selected option matching %r", label, value
+                )
                 return True
             if is_combobox:
                 fill_combobox = (
@@ -541,14 +793,464 @@ def fill_text(page, filled_ids: set[str], labels: list[str], value: str) -> bool
                     else _fill_autocomplete
                 )
                 if not fill_combobox(page, el, value):
+                    log.debug("Fill-text: label %r is a combobox, %r did not match", label, value)
                     continue
                 track(filled_ids, el)
+                log.debug("Fill-text: label %r is a combobox, filled %r", label, value)
                 return True
             el.fill(value)
             track(filled_ids, el)
+            log.debug("Fill-text: label %r is a plain field, filled %r", label, value)
             return True
         except Exception:
+            log.debug("Fill-text: attempt for label %r failed", label, exc_info=True)
             continue
+    log.debug("Fill-text: no field matched any of %s for %r", labels, value)
+    return False
+
+
+def fill_typed(page, filled_ids: set[str], labels: list[str], value: str) -> bool:
+    """Fills a plain field with real keystrokes rather than fill_text's
+    .fill(). Confirmed live on Paylocity: an address-block widget family
+    (Address Line 2, Zip, City, County) looks like ordinary inputs but only
+    registers with the page's own validation on genuine per-keystroke events —
+    .fill() leaves the text visible while the page still considers the field
+    unanswered. Typing into a genuinely plain field has the same end result,
+    so this is safe for any of them.
+    """
+    for label in labels:
+        try:
+            el = _locate_field_for_label(page, label)
+            if el is None:
+                continue
+            # Never clobber a value that's already right. An address widget
+            # that auto-fills City/County/State/Zip on selection treats a
+            # clear-and-retype of those as a hand-edit of its validated
+            # address and resets the whole group (confirmed live on
+            # Paylocity). The page's own value may also be the more specific
+            # one — ZIP+4 over a bare ZIP — so it wins.
+            current = (el.input_value() or "").strip()
+            if current and value.strip().lower() in current.lower():
+                track(filled_ids, el)
+                log.debug(
+                    "Fill-typed: label %r already holds %r (covers %r), leaving it alone",
+                    label,
+                    current,
+                    value,
+                )
+                return True
+            if not _type_verified(el, value):
+                log.debug("Fill-typed: label %r never matched %r after retries", label, value)
+                continue
+            track(filled_ids, el)
+            log.debug("Fill-typed: label %r typed %r", label, value)
+            return True
+        except Exception:
+            log.debug("Fill-typed: attempt for label %r failed", label, exc_info=True)
+            continue
+    log.debug("Fill-typed: no field matched any of %s for %r", labels, value)
+    return False
+
+
+def fill_exact_choice(page, filled_ids: set[str], labels: list[str], candidates: list[str]) -> bool:
+    """Fills a field by trying each of `candidates` (most-preferred first) as an
+    *exact*, case-insensitive match against whatever the live control actually
+    offers — never the substring match TEXT_LABELS' generic native-<select>
+    handling uses (`el.select_option(label=re.compile(...))`), which is exactly
+    how a profile value "CA" could silently select the option "North Carolina"
+    instead of "California": both contain "ca". Used for fields where a wrong
+    pick is a factual claim about the candidate, not a stylistic difference —
+    state and country. A control that is neither a <select> nor an ARIA
+    combobox is treated as a possible unmarked typeahead: the candidate is
+    typed and a suggestion list watched for, falling back to the typed value
+    if none appears.
+    """
+    # A field can still be mid-hydration here, so don't conclude it's absent
+    # from a single early check. Kept short: this is pure waiting on a form
+    # that simply has no such field, and it exits immediately once one is
+    # present.
+    for hydration_attempt in range(3):
+        if any(_locate_field_for_label(page, label) is not None for label in labels):
+            break
+        if hydration_attempt < 2:
+            page.wait_for_timeout(500)
+    for label in labels:
+        try:
+            el = _locate_field_for_label(page, label)
+            if el is None:
+                continue
+            # A country/state field may already hold the right value as the
+            # page's own default. Checked before any tag/role branching: such a
+            # field isn't necessarily a properly ARIA-marked combobox (
+            # Paylocity's Country input carries no role at all), and
+            # re-selecting an already-correct value risks a click blocked by
+            # the selected-value display sitting over it.
+            # Polled rather than read once: this value can land a beat after
+            # another field's change triggers it (selecting an address
+            # auto-fills State), and deciding "it's empty" from a single early
+            # read means fighting an overlay to fill a field that's already
+            # correct.
+            lowered_candidates = {c.strip().lower() for c in candidates}
+            current: list[str] = []
+            for settle_attempt in range(6):
+                current = _react_select_selected_labels(el)
+                if any(v.strip().lower() in lowered_candidates for v in current):
+                    track(filled_ids, el)
+                    log.debug("Exact-choice: field already shows %s, skipping re-fill", current)
+                    return True
+                if settle_attempt < 5:
+                    page.wait_for_timeout(250)
+            tag = el.evaluate("e => e.tagName.toLowerCase()")
+            is_combobox = tag == "input" and (el.get_attribute("role") or "") == "combobox"
+            if tag == "select":
+                live_options = _select_options(el)
+                log.debug(
+                    "Exact-choice: field for label %r is a <select> with live options %s, "
+                    "trying candidates %s",
+                    label,
+                    live_options,
+                    candidates,
+                )
+                match = next(
+                    (
+                        option
+                        for option in live_options
+                        if option.strip().lower() in {c.strip().lower() for c in candidates}
+                    ),
+                    None,
+                )
+                if match is None:
+                    log.debug("Exact-choice: none of %s found among live options", candidates)
+                    continue
+                el.select_option(label=match)
+                track(filled_ids, el)
+                log.debug("Exact-choice: selected %r", match)
+                return True
+            if is_combobox:
+                log.debug(
+                    "Exact-choice: field for label %r is a combobox, trying candidates %s",
+                    label,
+                    candidates,
+                )
+                fill_combobox = (
+                    _fill_react_select
+                    if _control_kind(el) == "react_select"
+                    else _fill_autocomplete
+                )
+                if not any(fill_combobox(page, el, candidate) for candidate in candidates):
+                    log.debug("Exact-choice: none of %s matched the combobox's options", candidates)
+                    continue
+                track(filled_ids, el)
+                log.debug("Exact-choice: combobox filled")
+                return True
+            # Neither a native <select> nor role="combobox" -- but a field whose
+            # accessible label is itself a placeholder-shaped phrase (confirmed
+            # live: "State\nSelect a state") is a strong sign this is actually a
+            # JS-driven typeahead with no standard ARIA markup, the same shape
+            # fill_address already has to handle for street addresses. Blindly
+            # .fill()-ing such a field sets the visible text without the page's
+            # own JS/validation ever registering it as answered — confirmed live
+            # as "field looked filled but the form rejected it". .type() (not
+            # .fill()) so any such widget's own per-keystroke listener actually
+            # fires, then check for a suggestion list the same way fill_address
+            # does.
+            if not _type_verified(el, candidates[0]):
+                log.debug(
+                    "Exact-choice: %r never matched after retries, giving up on label %r",
+                    candidates[0],
+                    label,
+                )
+                continue
+            options = None
+            for _ in range(8):
+                page.wait_for_timeout(250)
+                candidate_options = _address_suggestion_options(page)
+                if candidate_options is not None and candidate_options.count() > 0:
+                    options = candidate_options
+                    break
+            if options is None:
+                # No suggestion widget ever appeared -- a genuinely plain field,
+                # and the value is already typed in.
+                track(filled_ids, el)
+                log.debug("Exact-choice: plain text field, typed %r", candidates[0])
+                return True
+            count = min(options.count(), 20)
+            texts = [(options.nth(i).inner_text() or "").strip() for i in range(count)]
+            log.debug(
+                "Exact-choice: suggestion widget offered %s for candidates %s", texts, candidates
+            )
+            lowered_candidates = {c.strip().lower() for c in candidates}
+            match_idx = next(
+                (i for i, text in enumerate(texts) if text.strip().lower() in lowered_candidates),
+                None,
+            )
+            if match_idx is None:
+                # State/country have a small, closed value set -- unlike
+                # address, there's no need for combination-based scoring here.
+                # If none of our candidates exactly match an offered option,
+                # something is genuinely wrong; refuse rather than guess.
+                log.debug(
+                    "Exact-choice: none of %s exactly matched an offered suggestion", candidates
+                )
+                continue
+            options.nth(match_idx).click()
+            page.wait_for_timeout(300)
+            track(filled_ids, el)
+            log.debug("Exact-choice: selected suggestion %r", texts[match_idx])
+            return True
+        except Exception:
+            log.debug("Exact-choice: attempt for label %r failed", label, exc_info=True)
+            continue
+    log.debug("Exact-choice: no field matched any of %s for %s", labels, candidates)
+    return False
+
+
+def _wait_for_suggestions(page, rounds: int, context: str):
+    """Polls up to `rounds` x 250ms for a suggestion list that actually has
+    rows, returning its options locator or None."""
+    for attempt in range(rounds):
+        page.wait_for_timeout(250)
+        options = _address_suggestion_options(page)
+        if options is not None and options.count() > 0:
+            log.debug(
+                "Address: dropdown opened %s after %dms (%d option(s))",
+                context,
+                (attempt + 1) * 250,
+                options.count(),
+            )
+            return options
+    return None
+
+
+def _type_and_watch_for_dropdown(page, el, value: str):
+    """Types `value` and watches for the widget's suggestion list throughout,
+    rather than typing the whole string in one burst and only looking after.
+
+    Confirmed live (Paylocity): typing "765" by hand opened a 6-result
+    dropdown while the full "765 Montague Expy" typed at 20ms a character
+    opened nothing. These widgets debounce their lookup and key it off the
+    current query, so a burst-typed full string can both outrun the debounce
+    and be a narrower query than the one that matches. Typing a short prefix
+    first, pausing for the debounce, then typing the rest mirrors the
+    interaction that works by hand.
+    """
+    prefix = value.strip()[:_ADDRESS_PREFIX_CHARS]
+    remainder = value.strip()[_ADDRESS_PREFIX_CHARS:]
+    try:
+        el.click(timeout=_BLOCKED_CLICK_TIMEOUT_MS)
+        el.fill("")
+        el.press_sequentially(prefix, delay=_ADDRESS_TYPE_DELAY_MS)
+        on_prefix = _wait_for_suggestions(page, 6, "on prefix %r" % prefix)
+        if not remainder:
+            return on_prefix
+        # The field still has to end up holding the full address if no
+        # suggestion is ever selected, and the narrower full query usually
+        # produces the better match — so always type the rest, then look again.
+        el.press_sequentially(remainder, delay=_ADDRESS_TYPE_DELAY_MS)
+        on_full = _wait_for_suggestions(page, 8, "on full value %r" % value)
+        if on_full is not None:
+            return on_full
+        if on_prefix is not None:
+            # Open on the prefix but not the full string: re-type the prefix so
+            # there's a list to select from at all.
+            el.fill("")
+            el.press_sequentially(prefix, delay=_ADDRESS_TYPE_DELAY_MS)
+            return _wait_for_suggestions(page, 6, "on re-typed prefix %r" % prefix)
+        return None
+    except Exception:
+        log.debug("Address: typing/dropdown watch failed", exc_info=True)
+        return None
+
+
+def _address_suggestion_options(page):
+    """Returns the options locator for whichever address-suggestion widget is
+    currently open (dropdown), or None if the field is behaving as a plain
+    textbox instead. Checks, in order: the generic ARIA listbox/option pattern
+    (covers a react-select-style address combobox); bare `[role='option']`
+    elements with no enclosing `role='listbox']` wrapper (some widgets only tag
+    the individual rows); then Google Places Autocomplete's classic
+    `.pac-container`/`.pac-item` markup, which carries no ARIA role at all but
+    is the single most common real address-suggestion widget embedded in ATS
+    forms. Playwright's locators pierce open shadow DOM by default, so this
+    also reaches a shadow-rendered listbox without special-casing it."""
+    listboxes = page.locator("[role='listbox']:visible")
+    if listboxes.count() > 0:
+        return listboxes.first.get_by_role("option")
+    bare_options = page.locator("[role='option']:visible")
+    if bare_options.count() > 0:
+        return bare_options
+    pac = page.locator(".pac-container:visible")
+    if pac.count() > 0:
+        return pac.first.locator(".pac-item")
+    return None
+
+
+# A suggestion set can offer the identical street/city/state/zip twice, differing
+# only by unit number. Used solely to break such a tie in favour of the plain
+# suggestion — never to match against the profile's own address2 value.
+_UNIT_INDICATOR_PATTERN = re.compile(r"\b(apt|apartment|unit|suite|ste|fl|floor)\b", re.IGNORECASE)
+
+# Short enough to be a query the lookup service has results for, long enough to
+# be worth searching on; 90ms/char is roughly human typing speed, slow enough not
+# to outrun a debounced per-keystroke handler.
+_ADDRESS_PREFIX_CHARS = 8
+_ADDRESS_TYPE_DELAY_MS = 90
+# How long to let the widget's own City/County/State/Zip auto-fill land after a
+# suggestion is selected, before anything else inspects those fields.
+_ADDRESS_AUTOFILL_SETTLE_MS = 1500
+# A click that can't land because something overlaps the field never starts
+# working after more retries — fail fast rather than stalling a whole attempt.
+_BLOCKED_CLICK_TIMEOUT_MS = 5000
+
+
+def _best_address_match(
+    texts: list[str],
+    typed: str,
+    expected_city: str,
+    expected_state: str,
+    expected_country: str,
+    expected_zip: str,
+) -> int | None:
+    """Scores each suggestion against every combination of what the profile
+    actually knows about this address — the typed street number, city, state
+    (either form), country (including aliases like "USA"), and zip — rather
+    than trusting string similarity to `typed` alone: a typed "123 Main St"
+    will never appear verbatim in a suggestion formatted as "123 Main St,
+    Springfield, IL 62704, USA". Not every signal needs to be present for a
+    given field/form (address alone, address+city, address+state+country+zip,
+    and everything in between are all real, confirmed formats); this scores
+    whichever of them are actually available and requires at least two to
+    agree before trusting a suggestion, since a single coincidental match
+    isn't enough — the zip counts double, as a coincidental zip match is very
+    unlikely on its own. Never reads address2 (apartment/unit) as a signal —
+    a suggestion list can offer the identical street/city/zip twice, differing
+    only by unit number ("123 Main St, Springfield, IL" vs "123 Main St, Apt
+    4, Springfield, IL"), and on that specific kind of tie (confirmed live),
+    the plain, no-unit suggestion is preferred by default — a static
+    preference for the general building entry, not a lookup against the
+    profile's own unit value. Any other tie (nothing to do with a unit
+    number), or nothing clearing the bar at all, still refuses rather than
+    picking one — the same posture _fill_react_select already takes on a
+    genuinely ambiguous option set.
+    """
+    street_number_match = re.match(r"\s*(\d+)", typed)
+    street_number = street_number_match.group(1) if street_number_match else None
+    state_variants = _state_name_variants(expected_state) if expected_state else []
+    country_variants = _country_name_variants(expected_country)
+    scores = []
+    for text in texts:
+        lowered = text.lower()
+        score = 0
+        if expected_zip and expected_zip.lower() in lowered:
+            score += 2
+        if expected_city and expected_city.lower() in lowered:
+            score += 1
+        if state_variants and any(v.lower() in lowered for v in state_variants if v):
+            score += 1
+        if country_variants and any(v.lower() in lowered for v in country_variants):
+            score += 1
+        if street_number and re.search(rf"\b{re.escape(street_number)}\b", text):
+            score += 1
+        scores.append(score)
+    if not scores:
+        return None
+    best_score = max(scores)
+    if best_score < 2:
+        return None
+    best_indices = [i for i, score in enumerate(scores) if score == best_score]
+    if len(best_indices) == 1:
+        return best_indices[0]
+    # A tie: if it's specifically the "same address, differs only by unit"
+    # shape, prefer whichever tied option names no unit at all. Only applies
+    # when exactly one tied candidate qualifies -- a tie among several
+    # unit-free options (or several that all name a unit) is still genuinely
+    # ambiguous and refuses like any other unresolved tie.
+    unit_free = [i for i in best_indices if not _UNIT_INDICATOR_PATTERN.search(texts[i])]
+    return unit_free[0] if len(unit_free) == 1 else None
+
+
+def fill_address(
+    page,
+    filled_ids: set[str],
+    labels: list[str],
+    value: str,
+    expected_city: str = "",
+    expected_state: str = "",
+    expected_country: str = "",
+    expected_zip: str = "",
+) -> bool:
+    """Fills the primary street-address line. Types the value (not .fill(), so
+    a JS-driven widget's own per-keystroke listener actually fires), then
+    checks whether the field behaves as a dropdown or a plain textbox:
+
+    - Plain textbox (no suggestion widget ever opens): the typed value is
+      already correct, nothing more to do.
+    - Dropdown: the offered suggestions are scored against the profile's own
+      city/state/country/zip in whatever combination is actually
+      corroborated (see _best_address_match), and only a confidently-verified
+      suggestion is clicked — never accepted via Enter, which would just take
+      the widget's own default-highlighted option (usually the first result)
+      instead of the one actually confirmed correct, and risks submitting the
+      whole form early if Enter in this field happens to trigger implicit
+      form submission.
+
+    If a dropdown appears but nothing is confidently corroborated, this
+    returns False rather than guessing: the field flows through the normal
+    required-field pipeline (Tier B/C/D, then honest refusal) the same as any
+    other field this routine can't confidently answer — never a silent guess
+    at a real mailing address.
+    """
+    for label in labels:
+        try:
+            el = _locate_field_for_label(page, label)
+            if el is None:
+                continue
+            log.debug("Address: field located via label %r, starting typing %r", label, value)
+            options = _type_and_watch_for_dropdown(page, el, value)
+            if options is None:
+                log.debug("Address: no dropdown opened, keeping typed value %r", value)
+                track(filled_ids, el)
+                return True
+            count = min(options.count(), 20)
+            texts = [(options.nth(i).inner_text() or "").strip() for i in range(count)]
+            log.debug("Address: suggestions offered: %s", texts)
+            match_idx = _best_address_match(
+                texts,
+                value,
+                expected_city,
+                expected_state,
+                expected_country,
+                expected_zip,
+            )
+            if match_idx is None:
+                # Deliberately not pressing Escape/clearing here: on several
+                # real combobox widgets that reverts the input to empty rather
+                # than just closing the list, throwing away the typed value
+                # for no benefit.
+                log.debug(
+                    "Address: no suggestion confidently matches the profile's "
+                    "city/state/country/zip/address2 -- leaving typed value, field unresolved"
+                )
+                return False
+            log.debug("Address: selecting suggestion %r", texts[match_idx])
+            options.nth(match_idx).click()
+            # Selecting a suggestion makes this widget populate
+            # City/County/State/Zip itself, but not instantly. Anything reading
+            # those fields before the auto-fill lands sees them empty and fills
+            # them itself, undoing the widget's work. Bounded so a page with
+            # persistent background chatter can't hang here.
+            try:
+                page.wait_for_load_state("networkidle", timeout=_ADDRESS_AUTOFILL_SETTLE_MS)
+            except Exception:
+                pass
+            page.wait_for_timeout(_ADDRESS_AUTOFILL_SETTLE_MS)
+            track(filled_ids, el)
+            log.debug("Address: selected from dropdown, done")
+            return True
+        except Exception:
+            log.debug("Address: fill attempt for label %r failed", label, exc_info=True)
+            continue
+    log.debug("Address: no field matched any of %s", labels)
     return False
 
 
@@ -1385,6 +2087,37 @@ _INVALID_COUNT_JS = """
         ) {
             return true;
         }
+        if (el.tagName === 'INPUT' && el.required && el.value === '') {
+            // A react-select-style combobox's own underlying search input can be
+            // required *and* stay empty by design even once a value is genuinely
+            // selected -- the selection lives in the app's own state, rendered via
+            // a separate nearby "selected value" element, never written back into
+            // this input's own value. Confirmed live: Paylocity's Country field
+            // shows "United States" this way and is correctly left untouched once
+            // already correct (see fill_exact_choice), but still failed this
+            // check for exactly that reason. Same walk-up/selector
+            // _react_select_selected_labels already uses to detect this, so
+            // "already correct" and "excused here" always agree with each other.
+            //
+            // Climbing several ancestor levels risks reaching a container wide
+            // enough to also hold *other*, unrelated required fields -- at that
+            // point querySelector (which searches every descendant) could find
+            // a completely different field's own selected-value display and
+            // wrongly excuse a genuinely-blank one. Stop at the first level
+            // that has any selected-value display at all, and only trust it if
+            // that same container holds exactly one required input -- this one.
+            // A shared/ambiguous container refuses rather than risk a false
+            // excuse, the same posture as everywhere else in this file.
+            let node = el.parentElement;
+            for (let depth = 0; depth < 8 && node; depth += 1, node = node.parentElement) {
+                const selected = node.querySelector(
+                    '[class*="single-value"], [class*="multi-value__label"]'
+                );
+                if (!selected || !(selected.textContent || '').trim()) continue;
+                const requiredHere = node.querySelectorAll('input[required]');
+                return requiredHere.length === 1 && requiredHere[0] === el;
+            }
+        }
         if (el.tagName === 'FIELDSET' || el.tagName === 'FORM') {
             // A container only inherits :invalid from its own descendants -- excuse
             // it too, but only if every single invalid descendant is itself
@@ -1415,6 +2148,24 @@ def count_genuinely_invalid(page) -> int:
         return page.locator(":invalid").count()
 
 
+_INVALID_LABELS_JS = _INVALID_COUNT_JS.replace(
+    "    ).length;",
+    "    ).filter((el) => el.tagName !== 'FIELDSET' && el.tagName !== 'FORM')"
+    "     .map((el) => el.id || el.name || (el.tagName + '[type=' + el.type + ']'));",
+)
+
+
+def genuinely_invalid_field_labels(page) -> list[str]:
+    """Same excusability logic as count_genuinely_invalid, but naming each
+    surviving invalid element (id, or name, or a short tag/type fallback)
+    instead of just counting them — purely diagnostic, for logging which
+    field(s) the final gate actually refused on instead of just how many."""
+    try:
+        return page.evaluate(_INVALID_LABELS_JS)
+    except Exception:
+        return []
+
+
 def _fill_answer(page, field: "_UnhandledField", value: str) -> bool:
     """Applies an accepted AnswerAttempt's value to a previously-captured unhandled
     field, using the same per-type fill strategy fill_text/fill_yes_no already use —
@@ -1437,8 +2188,17 @@ def _fill_answer(page, field: "_UnhandledField", value: str) -> bool:
                 and (field.locator.get_attribute("role") or "") == "combobox"
             ):
                 return _fill_react_select(page, field.locator, value)
-            field.locator.fill(value)
-            return True
+            # Real typed keystrokes, not .fill(): the same "looks like a plain
+            # <input> but secretly needs genuine per-keystroke events to
+            # register with the page's own validation" shape fill_typed was
+            # built for (confirmed live on this exact Paylocity address block)
+            # applies here too -- an approved answer replayed via .fill() can
+            # fail the same way the original Tier A attempt did. Verified, not
+            # a bare .type(): a fast per-keystroke sequence can drop a
+            # character on a page whose own JS does heavy per-keystroke work
+            # (see _type_verified) -- confirmed live as "765 Montague Expy"
+            # landing as "765 ontague Expy" with no error anywhere.
+            return _type_verified(field.locator, value)
         if descriptor.field_type == "select":
             field.locator.select_option(label=re.compile(re.escape(value), re.IGNORECASE))
             return True
