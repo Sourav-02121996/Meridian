@@ -110,7 +110,14 @@ def crawl(
 
     with sync_playwright() as playwright:
         use_headless = get_settings().crawler_headless if headed is None else not headed
-        browser = playwright.chromium.launch(headless=use_headless)
+        browser = playwright.chromium.launch(
+            headless=use_headless,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+            ]
+        )
         page = browser.new_page()
 
         def capture(response: Response):
@@ -123,9 +130,15 @@ def crawl(
 
         page.on("response", capture)
         try:
+            log.info(f"🌐 Navigating to HiringCafe: {url[:100]}...")  # Log first 100 chars of URL
             page.goto(url, wait_until="networkidle", timeout=60_000)
-        except PlaywrightTimeoutError:
-            log.warning("HiringCafe did not become network-idle; continuing with the rendered page")
+            log.info("✅ HiringCafe page loaded successfully")
+        except PlaywrightTimeoutError as e:
+            log.warning(f"⏱️ HiringCafe timeout: {e}")
+        except Exception as e:
+            log.error(f"❌ Network error accessing HiringCafe: {e}")
+            log.error(f"Error type: {type(e).__name__}")
+            raise
         add(_ssr_items(page.content()))
         stagnant = 0
         while len(collected) < target and stagnant < 3:
